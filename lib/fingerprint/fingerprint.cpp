@@ -286,6 +286,8 @@ bool unlockWithFingerprint(DisplayResultCallback displayResultCallback) {
     } else {
         displayResultCallback("Access Denied!", TFT_RED);
         Serial.println("Fingerprint not verified!");
+        delay(1000);
+        isNormalMode = true;
         incrementFailedAttempt();
         return false;
     }

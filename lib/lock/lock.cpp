@@ -1,5 +1,5 @@
 #include "lock.h"
-#include "user_interface.h"
+#include "mqtt.h"
 
 unsigned long lockOpenTime = 0;
 unsigned long lastDoorCheckTime = 0;
@@ -69,13 +69,11 @@ void resetFailedAttempts() {
 }
 
 void lockOpen() {
-    if (isSystemLockedOut()) {
-        return;
-    }
+    if (isSystemLockedOut()) return;
     
     digitalWrite(LOCK_PIN, HIGH);
     Serial.println("Lock opened");
-    
+    messageLock("UNLOCK");
     isLockOpen = true;
     isDoorAlertActive = false;
     doorHasBeenOpened = false;
@@ -84,21 +82,19 @@ void lockOpen() {
 }
 
 void lockClose() {
-    if (isSystemLockedOut()) {
-        return;
-    }
+    if (isSystemLockedOut()) return;
+    
     digitalWrite(LOCK_PIN, LOW);
     Serial.println("Lock closed");
-
+    messageLock("LOCK");
     isLockOpen = false;
     isDoorAlertActive = false;
     doorHasBeenOpened = false;
 }
 
 void checkDoorStatus() {
-    if (isSystemLockedOut()) {
-        return;
-    }
+    if (isSystemLockedOut()) return;
+    
     if (millis() - lastDoorCheckTime >= DOOR_CHECK_TIME) {
         lastDoorCheckTime = millis();
         if (magneticHallCheck() && (millis() - lockOpenTime >= MAX_DOOR_OPEN_TIME)) {
@@ -116,9 +112,7 @@ void checkDoorStatus() {
 }
 
 void lockUpdate() {
-    if (isSystemLockedOut()) {
-        return;
-    }
+    if (isSystemLockedOut()) return;
     
     if (isLockOpen && !magneticHallCheck() && !doorHasBeenOpened && 
         (millis() - lockOpenWithoutDoorOpenTime >= UNUSED_OPEN_TIMEOUT)) {

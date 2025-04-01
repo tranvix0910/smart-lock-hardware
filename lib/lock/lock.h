@@ -1,12 +1,7 @@
 #ifndef LOCK_H
 #define LOCK_H
 
-#include <Arduino.h>
-#include "magnetic_hall.h"
-#include "alert.h"
-#include "user_interface.h"
-
-#define LOCK_PIN 32
+#include "common.h"
 
 #define LOCK_TIMEOUT 30000    
 #define DOOR_CHECK_TIME 1000  
@@ -17,7 +12,6 @@
 extern unsigned long lockOpenTime;
 extern unsigned long lastDoorCheckTime;
 extern unsigned long lockOpenWithoutDoorOpenTime;
-extern bool isLockOpen;
 extern bool isDoorAlertActive;
 extern bool isSystemLocked;
 extern uint8_t failedAttempts;
@@ -27,7 +21,6 @@ void lockInit();
 void lockOpen();
 void lockClose();
 void lockUpdate();
-
 void checkDoorStatus();
 void incrementFailedAttempt();
 void resetFailedAttempts();

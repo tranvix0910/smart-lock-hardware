@@ -1,13 +1,13 @@
 #include "user_interface.h"
 
 TFT_eSPI tft = TFT_eSPI();
-WebsocketsServer server;
-WebsocketsClient client;
+WebsocketsServer WebSocketServer;
+WebsocketsClient WebSocketClient;
 
 static unsigned long lastMotionTime = 0;
 
 void websocketInit() {
-    server.listen(8888);
+    WebSocketServer.listen(8888);
     Serial.println("WebSocket server started on port 8888");
 }
 
@@ -69,35 +69,32 @@ void displayInit() {
 
 void showingImage() {
     tft.setRotation(1);
-    WebsocketsMessage msg = client.readBlocking();
+    WebsocketsMessage msg = WebSocketClient.readBlocking();
     TJpgDec.drawJpg(0, 0, (const uint8_t*)msg.c_str(), msg.length());
 }
 
 bool faceAuthentication() {
     Serial.println("Face Authentication Start");
-    WebsocketsMessage msg = client.readBlocking();
+    WebsocketsMessage msg = WebSocketClient.readBlocking();
     TJpgDec.drawJpg(0, 0, (const uint8_t*)msg.c_str(), msg.length());
     return authenticateFace(msg);
 }
 
 void handleImage() {
-    WebsocketsMessage msg = client.readBlocking();
+    WebsocketsMessage msg = WebSocketClient.readBlocking();
     TJpgDec.drawJpg(0, 0, (const uint8_t*)msg.c_str(), msg.length());
     uploadImageToS3(msg);
     compareFace(msg);
 }
 
 void websocketHandle() {
-
-    Serial.println("isNormalMode: " + String(isNormalMode));
-
-    if(server.poll()) {
-        client = server.accept();
+    if(WebSocketServer.poll()) {
+        WebSocketClient = WebSocketServer.accept();
         Serial.println("Client connected");
     }
 
-    if(client.available()) {
-        client.poll();
+    if(WebSocketClient.available()) {
+        WebSocketClient.poll();
         buttonEvent(handleImage, displayResult);
         if(isNormalMode) {
             showingImage();

@@ -16,8 +16,8 @@
 
 using namespace websockets;
 
-extern WebsocketsServer server;
-extern WebsocketsClient client;
+extern WebsocketsServer WebSocketServer;
+extern WebsocketsClient WebSocketClient;
 
 #define GFXFF 1
 #define FSB9 &FreeSerifBold9pt7b
@@ -55,9 +55,5 @@ void displaySetBrightness(uint8_t brightness);
 void displayTurnOn();
 void displayTurnOff();
 void displayCheckMotion();
-
-void displayClear();
-
-void displayResult(String message, uint16_t color);
 
 #endif

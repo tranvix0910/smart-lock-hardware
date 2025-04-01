@@ -7,7 +7,6 @@
 #include "fingerprint.h"
 #include "lock.h"
 
-extern bool isNormalMode;
 extern bool lastButtonState;
 
 #define LONG_PRESS_TIME 3000

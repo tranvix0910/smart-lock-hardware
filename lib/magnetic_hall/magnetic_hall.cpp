@@ -1,5 +1,4 @@
 #include "magnetic_hall.h"
-#include "alert.h"
 
 void magneticHallInit() {
     pinMode(MAGNETIC_HALL_PIN, INPUT);

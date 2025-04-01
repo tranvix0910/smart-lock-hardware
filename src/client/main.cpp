@@ -6,8 +6,8 @@
 #define CAMERA_MODEL_AI_THINKER
 #include "camera_pins.h"
 
-const char* ssid = "Tran Vix";
-const char* password = "09102004";
+const char* ssid = "ESP32-CAMERA";
+const char* password = "12345678";
 
 const char* websockets_server_host = "192.168.4.1";
 const uint16_t websockets_server_port = 8888;
