@@ -8,7 +8,6 @@
 #include <ArduinoWebsockets.h>
 #include <Adafruit_Fingerprint.h>
 
-#include "wifi.h"
 #include "api.h"
 #include "button.h"
 #include "motion_detect.h"

@@ -10,12 +10,17 @@
 #include "alert.h"
 
 void smartLockSystemInit() {
-
     Serial.begin(115200);
     delay(TIME_DELAY);
 
-    // Initialize WiFi config
     wifiConfigInit();
+    
+    while (wifiMode != 1) {
+        wifiConfigRun();
+        delay(100);
+    }
+    
+    Serial.println("WiFi connected successfully, initializing other modules...");
 
     // Initialize display
     displayInit();
@@ -44,7 +49,7 @@ void smartLockSystemInit() {
     // Initialize button capture image
     buttonInit();
 
-    // // Initialize lock
+    // Initialize lock
     lockInit();
 
     // Initialize buzzer
@@ -53,10 +58,11 @@ void smartLockSystemInit() {
 
 void smartLockSystemUpdate() {
 
-    // Wait for WiFi config
-    wifiConfigRun();
+    if (wifiMode != 1) {
+        wifiConfigRun();
+        return;
+    }
 
-    // Streaming Camera
     websocketHandle();
 
     // Motion Detection
@@ -68,6 +74,6 @@ void smartLockSystemUpdate() {
     // Check and process fingerprint if in scan mode
     checkFingerprintMode(displayResult);
 
-    // // MQTT
+    // MQTT
     clientLoop();
 }

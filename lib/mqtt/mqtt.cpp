@@ -1,19 +1,24 @@
 #include "mqtt.h"
 
+// Khai báo extern cho các biến toàn cục từ wifi_config.cpp
+extern String deviceId;
+extern String macAddress;
+extern String userId;
+
 WiFiClientSecure net;
 PubSubClient AWSIoTClient(net);
-const char* CLIENT_ID = "LOCK-001";
-const char* USER_ID = "39da459c-4001-704e-8a18-531c910c5e4b";
-char TOPIC_SUBSCRIBE[100];
-char TOPIC_PUBLISH[100];
+bool deviceVerified = false;
 
-void createSubscribeTopic() {
-    snprintf(TOPIC_SUBSCRIBE, sizeof(TOPIC_SUBSCRIBE), "server/%s/%s", USER_ID, CLIENT_ID);
-    Serial.print("Created subscribe topic: ");
-    Serial.println(TOPIC_SUBSCRIBE);
-    snprintf(TOPIC_PUBLISH, sizeof(TOPIC_PUBLISH), "smartlock/%s/%s", USER_ID, CLIENT_ID);
-    Serial.print("Created publish topic: ");
-    Serial.println(TOPIC_PUBLISH);
+String topicPublish;
+String topicSubscribe;
+
+bool subscribeTopic(const char* topic) {
+    if (AWSIoTClient.subscribe(topic)) {
+        Serial.print("Subscribed to topic: ");
+        Serial.println(topic);
+        return true;
+    }
+    return false;
 }
 
 void messageLock(String lockState) {
@@ -25,8 +30,8 @@ void messageLock(String lockState) {
     char timestamp[30];
     strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%S.000Z", gmtime(&now));
  
-    doc["deviceId"] = "LOCK-001";
-    doc["userId"] = "39da459c-4001-704e-8a18-531c910c5e4b";
+    doc["deviceId"] = deviceId;
+    doc["userId"] = userId;
     doc["lockState"] = lockState;
     doc["timestamp"] = timestamp;
     
@@ -35,11 +40,11 @@ void messageLock(String lockState) {
     Serial.println("Generated lock message:");
     Serial.println(output);
 
-    publishMessage(TOPIC_PUBLISH, output);
+    publishMessage(topicPublish.c_str(), output);
 }
 
-void processChangeState(const char* deviceId, const char* userId, const char* lockState) {
-    if (strcmp(deviceId, CLIENT_ID) != 0 || strcmp(userId, USER_ID) != 0) {
+void processChangeState(const char* deviceIdParam, const char* userIdParam, const char* lockState) {
+    if (strcmp(deviceIdParam, deviceId.c_str()) != 0 || strcmp(userIdParam, userId.c_str()) != 0) {
         Serial.println("Message not for this device");
         return;
     }
@@ -62,35 +67,83 @@ void handleMessage(char* topic, byte* payload, unsigned int length) {
     Serial.println(topic);
     Serial.print("Payload length: ");
     Serial.println(length);
-    Serial.print("Raw payload: ");
-    for (int i = 0; i < length; i++) {
-        Serial.print((char)payload[i]);
-    }
-    Serial.println();
     
+    String message = "";
+    for (int i = 0; i < length; i++) {
+        message += (char)payload[i];
+    }
+    Serial.print("Raw payload: ");
+    Serial.println(message);
+
+    // Phân tích JSON
     StaticJsonDocument<512> doc;
-    DeserializationError error = deserializeJson(doc, payload);
+    DeserializationError error = deserializeJson(doc, message);
     
     if (error) {
         Serial.print("JSON parsing failed: ");
         Serial.println(error.c_str());
         return;
     }
-    
-    const char* deviceId = doc["deviceId"];
-    const char* userId = doc["userId"];
-    
-    if (!deviceId || !userId) {
-        Serial.println("Missing required fields in JSON");
-        return;
+
+    // Connect device message
+    if (doc.containsKey("deviceId") && doc.containsKey("macAddress") && 
+        doc.containsKey("secretKey") && doc.containsKey("userId")) {
+        
+        // Lấy thông tin từ message
+        String receivedDeviceId = doc["deviceId"].as<String>();
+        String receivedMacAddress = doc["macAddress"].as<String>();
+        String receivedSecretKey = doc["secretKey"].as<String>();
+        String receivedUserId = doc["userId"].as<String>();
+        
+        // Lấy thông tin thiết bị hiện tại
+        extern String deviceId;
+        extern String macAddress;
+        extern String secretKey;
+        extern String userId;
+        
+        Serial.println("\n=== Comparing Device Information ===");
+        Serial.println("Received DeviceID: " + receivedDeviceId + " | Local: " + deviceId);
+        Serial.println("Received MAC: " + receivedMacAddress + " | Local: " + macAddress);
+        Serial.println("Received SecretKey: " + receivedSecretKey + " | Local: " + secretKey);
+        
+        // So sánh thông tin
+        if (receivedDeviceId == deviceId && 
+            receivedMacAddress == macAddress && 
+            receivedSecretKey == secretKey) {
+            
+            Serial.println("Device verification SUCCESS!");
+            deviceVerified = true;
+            
+            // Lưu userId
+            userId = receivedUserId;
+            
+            // Lưu vào EEPROM
+            extern void saveUserId(String id);
+            saveUserId(userId);
+            
+            return;
+        } else {
+            Serial.println("Device verification FAILED!");
+            deviceVerified = false;
+        }
     }
     
-    const char* lockState = doc["lockState"];
-    
-    processChangeState(deviceId, userId, lockState);
+    // Change state message
+    if (doc.containsKey("deviceId") && doc.containsKey("userId") && doc.containsKey("lockState")) {
+        const char* receivedDeviceId = doc["deviceId"];
+        const char* receivedUserId = doc["userId"];
+        const char* lockState = doc["lockState"];
+        
+        processChangeState(receivedDeviceId, receivedUserId, lockState);
+    }
 }
 
-void connectToAWSIoTCore() {
+// Hàm kiểm tra xem thiết bị đã được xác thực chưa
+bool isDeviceVerified() {
+    return deviceVerified;
+}
+
+bool connectToAWSIoTCore() {
     net.setCACert(AWS_CERT_CA);
     net.setCertificate(AWS_CERT_CRT);
     net.setPrivateKey(AWS_CERT_PRIVATE);
@@ -109,18 +162,25 @@ void connectToAWSIoTCore() {
     if (!AWSIoTClient.connected())
     {
         Serial.println("AWS IoT Timeout!");
-        return;
+        return false;
     }
-    
-    createSubscribeTopic();
-    if (AWSIoTClient.subscribe(TOPIC_SUBSCRIBE)) {
-        Serial.print("Subscribed to topic: ");
-        Serial.println(TOPIC_SUBSCRIBE);
-    } else {
-        Serial.println("Failed to subscribe to topic!");
-    }
+
+    topicPublish = "smartlock/" + String(userId) + "/" + String(deviceId);
+    topicSubscribe = "server/" + String(userId) + "/" + String(deviceId);
+
+    subscribeTopic(topicSubscribe.c_str());
     
     Serial.println("AWS IoT Connected!");
+    return true;
+    
+    // createSubscribeTopic();
+    // if (AWSIoTClient.subscribe(TOPIC_SUBSCRIBE)) {
+    //     Serial.print("Subscribed to topic: ");
+    //     Serial.println(TOPIC_SUBSCRIBE);
+    // } else {
+    //     Serial.println("Failed to subscribe to topic!");
+    // }
+    
 }
 
 void reconnect() {
@@ -128,10 +188,10 @@ void reconnect() {
         Serial.print("Attempting MQTT connection...");
         if (AWSIoTClient.connect(THINGNAME)) {
             Serial.println("connected");
-            createSubscribeTopic();
-            if (AWSIoTClient.subscribe(TOPIC_SUBSCRIBE)) {
+            subscribeTopic(topicSubscribe.c_str());
+            if (AWSIoTClient.subscribe(topicSubscribe.c_str())) {
                 Serial.print("Subscribed to topic: ");
-                Serial.println(TOPIC_SUBSCRIBE);
+                Serial.println(topicSubscribe.c_str());
             } else {
                 Serial.println("Failed to subscribe to topic!");
             }
@@ -145,6 +205,9 @@ void reconnect() {
 }
 
 void publishMessage(const char* topic, const char* message) {
+    Serial.print("Publishing message to topic: ");
+    Serial.println(topic);
+    Serial.println(message);
     AWSIoTClient.publish(topic, message);
 }
 
