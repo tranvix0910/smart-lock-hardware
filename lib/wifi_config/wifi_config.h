@@ -7,7 +7,8 @@
 #include <WebServer.h>
 #include "mqtt.h"
 
-// Khai báo các biến toàn cục
+#define EEPROM_SIZE 200
+
 extern WebServer webServer;
 extern String ssid;
 extern String password;
@@ -17,7 +18,6 @@ extern String secretKey;
 extern String userId;
 extern int wifiMode;
 
-// Khai báo các hàm
 void WiFiEvent(WiFiEvent_t event);
 void createAccessPoint();
 void setupWifi();
@@ -29,5 +29,5 @@ void wifiAPSetup();
 void generateDeviceInfo();
 void getDeviceInfoValues(const char* &deviceId, const char* &macAddress, const char* &userId);
 void saveUserId(String id);
-
+void clearAllData();
 #endif 

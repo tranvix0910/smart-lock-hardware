@@ -74,6 +74,9 @@ void smartLockSystemUpdate() {
     // Check and process fingerprint if in scan mode
     checkFingerprintMode(displayResult);
 
+    // check button reset mode
+    buttonResetMode();
+
     // MQTT
     clientLoop();
 }

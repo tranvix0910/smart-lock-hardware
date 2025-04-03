@@ -1,6 +1,5 @@
 #include "mqtt.h"
 
-// Khai báo extern cho các biến toàn cục từ wifi_config.cpp
 extern String deviceId;
 extern String macAddress;
 extern String userId;
@@ -85,8 +84,9 @@ void handleMessage(char* topic, byte* payload, unsigned int length) {
         return;
     }
 
-    // Connect device message
-    if (doc.containsKey("deviceId") && doc.containsKey("macAddress") && 
+    String topicString = String(topic);
+
+    if (topicString.startsWith("connect/") && doc.containsKey("deviceId") && doc.containsKey("macAddress") && 
         doc.containsKey("secretKey") && doc.containsKey("userId")) {
         
         // Lấy thông tin từ message
@@ -94,8 +94,6 @@ void handleMessage(char* topic, byte* payload, unsigned int length) {
         String receivedMacAddress = doc["macAddress"].as<String>();
         String receivedSecretKey = doc["secretKey"].as<String>();
         String receivedUserId = doc["userId"].as<String>();
-        
-        // Lấy thông tin thiết bị hiện tại
         extern String deviceId;
         extern String macAddress;
         extern String secretKey;
@@ -127,7 +125,45 @@ void handleMessage(char* topic, byte* payload, unsigned int length) {
             deviceVerified = false;
         }
     }
-    
+
+    if(topicString.startsWith("server-delete/")) {
+        Serial.println("Delete device message");
+        String modeReceived = doc["mode"].as<String>();
+        if(modeReceived == "DELETED DEVICE FROM SERVER") {
+            Serial.println("Delete request accepted");
+            deviceVerified = false;
+            Serial.println("Server confirmed deletion, clearing EEPROM...");
+                
+            for(int i = 0; i < EEPROM.length(); i++) {
+                EEPROM.write(i, 0);
+            }
+            
+            if (!EEPROM.commit()) {
+                Serial.println("Error committing to EEPROM!");
+                return;
+            }
+                
+            Serial.println("EEPROM cleared successfully!");
+            Serial.println("Device will restart in 2 seconds...");
+            
+            StaticJsonDocument<200> confirmDoc;
+            confirmDoc["userId"] = userId;
+            confirmDoc["deviceId"] = deviceId;
+            confirmDoc["mode"] = "DEVICE DELETED";
+            
+            String confirmJson;
+            serializeJson(confirmDoc, confirmJson);
+            
+            String topicDelete = "smartlock-delete/" + userId + "/" + deviceId;
+            publishMessage(topicDelete.c_str(), confirmJson.c_str());
+            Serial.println("Deletion confirmation sent: " + confirmJson);
+
+            delay(100);
+            ESP.restart();
+        } else {
+            Serial.println("No confirmation received from server");
+        }
+    }
     // Change state message
     if (doc.containsKey("deviceId") && doc.containsKey("userId") && doc.containsKey("lockState")) {
         const char* receivedDeviceId = doc["deviceId"];

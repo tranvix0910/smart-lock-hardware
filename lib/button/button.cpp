@@ -1,5 +1,9 @@
 #include "button.h"
 
+extern String deviceId;
+extern String macAddress;
+extern String userId;
+
 bool isNormalMode = true;
 bool lastButtonState = HIGH;
 unsigned long lastCheck = 0;
@@ -8,12 +12,65 @@ bool isFirstRun = true;
 unsigned long buttonPressStartTime = 0;
 uint8_t fingerprintMode = FINGERPRINT_SCAN_MODE;
 
+#define RESET_PRESS_TIME 5000
+
 void buttonInit() {
     pinMode(BUTTON_CAPTURE_PIN, INPUT_PULLUP);
+    pinMode(BUTTON_RESET_PIN, INPUT_PULLUP);
 }
 
 bool buttonCaptureImageRead() {
     return digitalRead(BUTTON_CAPTURE_PIN);
+}
+
+bool buttonResetRead() {
+    return digitalRead(BUTTON_RESET_PIN);
+}
+
+void buttonResetMode() {
+    static unsigned long resetPressStartTime = 0;
+    static bool isResetMode = false;
+    bool statusButtonPin = buttonResetRead();
+    
+    if (statusButtonPin == LOW && lastButtonState == HIGH) {
+        resetPressStartTime = millis();
+        isResetMode = true;
+        lastButtonState = LOW;
+        Serial.println("Reset mode: Button pressed, waiting for 5 seconds...");
+        
+        String topicDeleteSubscribe = "server-delete/" + userId + "/" + deviceId;
+        if(subscribeTopic(topicDeleteSubscribe.c_str())) {
+            Serial.println("Subscribed to topic: " + topicDeleteSubscribe);
+        } else {
+            Serial.println("Failed to subscribe to topic: " + topicDeleteSubscribe);
+        }
+    } 
+    else if (statusButtonPin == HIGH && lastButtonState == LOW) {
+        isResetMode = false;
+        lastButtonState = HIGH;
+        Serial.println("Reset mode: Button released before 5 seconds");
+    }
+    else if (isResetMode && statusButtonPin == LOW) {
+        unsigned long pressDuration = millis() - resetPressStartTime;
+        
+        if (pressDuration >= RESET_PRESS_TIME) {
+            Serial.println("Reset mode: 5 seconds reached, sending delete request...");
+            
+            StaticJsonDocument<200> doc;
+            doc["userId"] = userId;
+            doc["deviceId"] = deviceId;
+            doc["mode"] = "DELETE REQUEST APPCEPT FROM CLIENT";
+            
+            String topicDelete = "smartlock-delete/" + userId + "/" + deviceId;
+            String jsonString;
+            serializeJson(doc, jsonString);
+            
+            publishMessage(topicDelete.c_str(), jsonString.c_str());
+            Serial.println("Delete request sent: " + jsonString);
+            Serial.println("Waiting for server confirmation...");
+            delay(2000);
+        }
+    }
 }
 
 void checkFingerprintMode(DisplayResultCallback displayResultCallback) {

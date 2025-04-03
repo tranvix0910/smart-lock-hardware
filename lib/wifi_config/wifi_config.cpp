@@ -1,6 +1,5 @@
 #include "wifi_config.h"
 
-
 // Khởi tạo các biến toàn cục
 WebServer webServer(80);
 String ssid;
@@ -15,6 +14,7 @@ String userId;
 // 2: Lost
 int wifiMode;
 bool isWifiConnected = false;
+int addr = 0;
 
 const char html[] PROGMEM = R"html(
 <!DOCTYPE html>
@@ -437,7 +437,7 @@ const char html[] PROGMEM = R"html(
                 </div>
                 <p class="header-description">Wifi Config</p>
                 <div id="welcome-message" class="welcome-message">
-                    Welcome back! Your device is verified with User ID: <span id="welcome-userId"></span>
+                    Welcome! Your device is verified with User ID: <span id="welcome-userId"></span>
                 </div>
                 <div id="header-status" class="header-status">
                     <div class="loading-spinner"></div>
@@ -528,6 +528,12 @@ const char html[] PROGMEM = R"html(
             const statusTextElement = document.getElementById("status-text");
             const spinnerElement = document.getElementById("status-spinner");
             
+            // Nếu message rỗng, ẩn hoàn toàn phần tử status
+            if (!message) {
+                statusElement.style.display = "none";
+                return;
+            }
+            
             statusTextElement.innerText = message;
             
             // Xóa tất cả các class status hiện tại
@@ -537,11 +543,25 @@ const char html[] PROGMEM = R"html(
             statusElement.classList.add("status-" + type);
             
             // Hiện/ẩn spinner
-            if (type === "info") {
-                spinnerElement.style.display = "inline-block";
-            } else {
-                spinnerElement.style.display = "none";
-            }
+            spinnerElement.style.display = type === "info" ? "inline-block" : "none";
+        }
+
+        function showHeaderStatus(message) {
+            var headerStatus = document.getElementById('header-status');
+            document.querySelector('#header-status .status-text').textContent = message || "Waiting for create device from Server";
+            headerStatus.classList.add('show');
+            headerStatus.classList.remove('success');
+        }
+
+        function hideHeaderStatus() {
+            var headerStatus = document.getElementById('header-status');
+            headerStatus.classList.remove('show');
+        }
+
+        function showHeaderStatusSuccess(message) {
+            var headerStatus = document.getElementById('header-status');
+            document.querySelector('#header-status .status-text').textContent = message || "Device registered successfully";
+            headerStatus.classList.add('show', 'success');
         }
 
         // Hàm hiển thị loading overlay
@@ -596,35 +616,25 @@ const char html[] PROGMEM = R"html(
                     
                     try {
                         var data = JSON.parse(initVerifyXhr.responseText);
-                        // Kiểm tra có userId và userId không rỗng
+                        // Luôn hiển thị giao diện cấu hình WiFi
+                        document.getElementById('main-content').style.display = 'block';
+                        document.getElementById('auth-container').style.display = 'none';
+                        
+                        // Nếu có userId, hiển thị welcome message
                         if (data.userId && data.userId.trim() !== "") {
-                            // Hiển thị welcome message và cho phép truy cập
                             document.getElementById('welcome-userId').textContent = data.userId;
                             document.getElementById('welcome-message').style.display = 'block';
-                            document.getElementById('main-content').style.display = 'block';
-                            document.getElementById('auth-container').style.display = 'none';
-                            
-                            // Ẩn header status vì đã xác thực thành công
-                            document.getElementById('header-status').style.display = 'none';
-                            
-                            // Bắt đầu quét WiFi sau khi xác thực thành công
-                            setTimeout(scanWifi, 300);
-                        } else {
-                            // userId không tồn tại hoặc rỗng, hiển thị thông báo chặn truy cập
-                            document.getElementById('welcome-message').style.display = 'none';
-                            document.getElementById('main-content').style.display = 'none';
-                            document.getElementById('auth-container').style.display = 'block';
-                            
-                            // Bắt đầu quét WiFi sau khi hiển thị giao diện
-                            setTimeout(scanWifi, 300);
                         }
+                        
+                        // Bắt đầu quét WiFi
+                        setTimeout(scanWifi, 300);
                     } catch (e) {
                         console.error("Error checking initial verification status:", e);
-                        // Hiển thị giao diện chặn truy cập trong trường hợp lỗi
-                        document.getElementById('main-content').style.display = 'none';
-                        document.getElementById('auth-container').style.display = 'block';
+                        // Trong trường hợp lỗi, vẫn hiển thị giao diện cấu hình WiFi
+                        document.getElementById('main-content').style.display = 'block';
+                        document.getElementById('auth-container').style.display = 'none';
                         
-                        // Bắt đầu quét WiFi sau khi hiển thị giao diện
+                        // Bắt đầu quét WiFi
                         setTimeout(scanWifi, 300);
                     }
                 }
@@ -709,7 +719,8 @@ const char html[] PROGMEM = R"html(
                         
                         setTimeout(getDeviceInfo, 2000);
                     } else {
-                        updateStatus("Error saving config", "error");
+                        updateStatus("Incorrect WiFi credentials, please try again", "error");
+                        hideHeaderStatus(); // Ẩn header status nếu có lỗi
                     }
                 }
             };
@@ -717,6 +728,7 @@ const char html[] PROGMEM = R"html(
             xhr.open("GET", "/saveWifi?ssid=" + encodeURIComponent(ssid) + "&pass=" + encodeURIComponent(password), true);
             xhr.send();
         }
+
 
         // Hàm lấy thông tin thiết bị
         function getDeviceInfo() {
@@ -728,10 +740,19 @@ const char html[] PROGMEM = R"html(
                         document.getElementById("mac-address").textContent = data.macAddress;
                         document.getElementById("secret-key").textContent = data.secretKey;
                         document.getElementById("loading-status").style.display = "none";
-                        updateStatus("Device information loaded successfully", "success");
                         
-                        // Cập nhật trạng thái header và bắt đầu kiểm tra xác thực
-                        showHeaderStatus("Waiting for device registration...");
+                        // Hiển thị thông báo thành công và tắt sau 2 giây
+                        updateStatus("Device information loaded successfully", "success");
+                        setTimeout(function() {
+                            updateStatus("", ""); // Ẩn hoàn toàn thông báo
+                        }, 2000);
+                        
+                        // Cập nhật trạng thái header
+                        if (data.userId && data.userId.trim() !== "") {
+                            showHeaderStatusSuccess("Device registered successfully");
+                        } else {
+                            showHeaderStatus("Waiting for device registration...");
+                        }
                         
                         // Bắt đầu kiểm tra trạng thái xác thực
                         setTimeout(checkVerificationStatus, 1000);
@@ -745,6 +766,7 @@ const char html[] PROGMEM = R"html(
             xhr.open("GET", "/getDeviceInfo", true);
             xhr.send();
         }
+
 
         // Hàm khởi động lại ESP32
         function reStart() {
@@ -769,38 +791,37 @@ const char html[] PROGMEM = R"html(
                 if (verifyXhr.readyState == 4 && verifyXhr.status == 200) {
                     try {
                         var data = JSON.parse(verifyXhr.responseText);
-                        // Kiểm tra có userId và userId không rỗng
+                        // Luôn hiển thị giao diện cấu hình WiFi
+                        document.getElementById('main-content').style.display = 'block';
+                        document.getElementById('auth-container').style.display = 'none';
+                        
+                        // Nếu có userId, hiển thị welcome message
                         if (data.userId && data.userId.trim() !== "") {
-                            // Cập nhật UI khi có userId
-                            var headerStatus = document.getElementById('header-status');
-                            headerStatus.classList.add('success', 'show');
-                            document.querySelector('#header-status .status-text').textContent = 
-                                "Device registered with User ID: " + data.userId;
+                            // Ẩn tất cả các message khác
+                            hideHeaderStatus();
+                            updateStatus("", ""); // Ẩn status message
                             
-                            // Sau 3 giây, ẩn header status và hiển thị welcome message
-                            setTimeout(function() {
-                                headerStatus.classList.remove('show');
-                                setTimeout(function() {
-                                    document.getElementById('welcome-userId').textContent = data.userId;
-                                    document.getElementById('welcome-message').style.display = 'block';
-                                    document.getElementById('main-content').style.display = 'block';
-                                    document.getElementById('auth-container').style.display = 'none';
-                                }, 300);
-                            }, 3000);
+                            // Hiển thị welcome message
+                            document.getElementById('welcome-message').style.display = 'block';
+                            document.getElementById('welcome-userId').textContent = data.userId;
+                            
+                            // Hiển thị thông báo thành công trên header
+                            showHeaderStatusSuccess("Device registered successfully");
                         } else {
-                            // userId không tồn tại hoặc rỗng, giữ trạng thái chặn truy cập
-                            document.getElementById('main-content').style.display = 'none';
-                            document.getElementById('auth-container').style.display = 'block';
+                            // Nếu không có userId, ẩn welcome message
+                            document.getElementById('welcome-message').style.display = 'none';
+                            showHeaderStatus("Waiting for device registration...");
                         }
                     } catch (e) {
                         console.error("Error checking verification status:", e);
                     }
                 }
             };
-            
+    
             verifyXhr.open("GET", "/checkVerification", true);
             verifyXhr.send();
         }
+
         
         // Kiểm tra trạng thái xác thực mỗi 2 giây
         setInterval(checkVerificationStatus, 2000);
@@ -826,7 +847,7 @@ void getDeviceInfoValues(const char* &deviceIdPtr, const char* &macAddressPtr, c
 void generateDeviceInfo() {
     uint8_t macAddr[6];
     WiFi.softAPmacAddress(macAddr);
-    deviceId = "ESP32-" + String(macAddr[4], HEX) + String(macAddr[5], HEX);
+    deviceId = "SMTV-" + String(macAddr[4], HEX) + String(macAddr[5], HEX);
     deviceId.toUpperCase();
 
     macAddress = WiFi.macAddress();
@@ -854,7 +875,7 @@ void createAccessPoint(){
     uint8_t macAddr[6];
     WiFi.softAPmacAddress(macAddr);
 
-    String ssid_ap = "ESP32-" + String(macAddr[4], HEX) + String(macAddr[5], HEX);
+    String ssid_ap = "SMTV-" + String(macAddr[4], HEX) + String(macAddr[5], HEX);
     String password_ap = "12345678";
     ssid_ap.toUpperCase();
     WiFi.softAP(ssid_ap.c_str(), password_ap.c_str());
@@ -889,7 +910,7 @@ void WiFiEvent(WiFiEvent_t event) {
 }
 
 void setupWifi() {
-    if (ssid != "") {
+    if (ssid != "" && userId != "") {
         Serial.println("-----------------------------------");
         Serial.println("Connecting to WiFi...");
         Serial.print("SSID: ");
@@ -1069,8 +1090,18 @@ void setupWebServer() {
 void wifiConfigInit() {
     Serial.println("======== WiFi Config Init ========");
 
-    EEPROM.begin(200);
-    Serial.println("EEPROM initialized");
+    if (!EEPROM.begin(EEPROM_SIZE)) {
+        Serial.println("EEPROM initialized");
+    }
+    // for(int i = 0; i < EEPROM_SIZE; i++) {
+    //     Serial.print(byte(EEPROM.read(i)));
+    //     Serial.print(" ");
+    // }
+    // Serial.println();
+    // while(addr < EEPROM_SIZE) {
+    //     clearAllData();
+    // }
+    // EEPROM.commit();
 
     char deviceId_temp[10], macAddress_temp[18], secretKey_temp[10], userId_temp[37];
     char ssid_temp[32], password_temp[64];
@@ -1079,7 +1110,6 @@ void wifiConfigInit() {
     EEPROM.readString(32, password_temp, sizeof(password_temp));
     ssid = String(ssid_temp);
     password = String(password_temp);
-    
     
     EEPROM.readString(64, deviceId_temp, sizeof(deviceId_temp));
     EEPROM.readString(96, macAddress_temp, sizeof(macAddress_temp));
@@ -1158,5 +1188,10 @@ void saveUserId(String id) {
     Serial.println("Saving User ID to EEPROM: " + id);
     EEPROM.writeString(160, id);
     EEPROM.commit();
+}
+
+void clearAllData() {
+    EEPROM.write(addr, 0);
+    addr = addr + 1;
 }
 
