@@ -356,4 +356,18 @@ int getNextFreeID() {
     return -1;
 }
 
+String getLatestFingerprintTemplateAsBase64(uint8_t fingerprintID) {
+    char buffer[100];
+    sprintf(buffer, "{\"fingerprintID\":%d,\"timestamp\":\"%lld\"}", 
+            fingerprintID, 
+            (long long)millis());
+    
+    // Encode this data to base64
+    String base64Template = base64::encode((uint8_t*)buffer, strlen(buffer));
+    Serial.printf("Fingerprint metadata: %s\n", buffer);
+    Serial.printf("Base64 encoded: %s\n", base64Template.c_str());
+    
+    return base64Template;
+}
+
 

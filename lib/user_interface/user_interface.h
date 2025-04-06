@@ -12,6 +12,8 @@
 #include "button.h"
 #include "motion_detect.h"
 #include "fingerprint.h"
+#include "lock.h"
+#include "magnetic_hall.h"
 
 using namespace websockets;
 
@@ -54,5 +56,6 @@ void displaySetBrightness(uint8_t brightness);
 void displayTurnOn();
 void displayTurnOff();
 void displayCheckMotion();
+void displayResult(String message, uint16_t color);
 
 #endif

@@ -18,7 +18,10 @@
 
 using namespace websockets;
 
+// Global variables
 extern String livenessCheckResult;
+extern String faceId;
+extern const char* user_name;
 
 void parsingJSONResult(
     String response, 

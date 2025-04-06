@@ -1,6 +1,11 @@
 #include "api.h"
 
+// Define global variables
 String livenessCheckResult = "";
+extern String userId;
+extern String deviceId;
+String faceId = "";
+const char* user_name = "Undefined";
 
 String convertToVietnamTime(String isoTimestamp) {
     // Trích xuất năm, tháng, ngày, giờ, phút, giây từ chuỗi timestamp
@@ -63,8 +68,9 @@ void parsingJSONResult(String response, uint16_t SCREEN_COLOR, String message, S
         return;
     }
 
-    const char* user_name = doc["user_name"];
+    user_name = doc["user_name"];
     double similarity = doc["similarity"];
+    faceId = doc["faceId"].as<String>();
     String timestamp = doc["timestamp"];
     String vietnamTime = convertToVietnamTime(timestamp);
     displayJSONParsingResult(SCREEN_COLOR, message, livenessCheckResult, user_name, vietnamTime, similarity, failedAttempts);
@@ -104,8 +110,10 @@ void compareFace(WebsocketsMessage msg){
 
     HTTPClient http;
 
-    String apiUrl = "https://rxmieh048b.execute-api.ap-southeast-1.amazonaws.com/compare/" + bucketName + "/" + fileName;
+    String rekognitionCollectionId = "smartlock-" + userId + "-" + deviceId;
+    String apiUrl = "https://rxmieh048b.execute-api.ap-southeast-1.amazonaws.com/compare/" + bucketName + "/" + fileName + "?collection_id=" + rekognitionCollectionId;
     Serial.println("API URL: " + apiUrl);
+    Serial.println("Rekognition Collection ID: " + rekognitionCollectionId);
 
     http.begin(apiUrl);
     http.addHeader("Content-Type", "image/jpeg");
@@ -121,7 +129,7 @@ void compareFace(WebsocketsMessage msg){
         int httpResponseCode = http.POST((uint8_t*)msg.c_str(), msg.length());
         String response = http.getString();
 
-        DynamicJsonDocument doc(1024);
+        DynamicJsonDocument doc(1024);  
         DeserializationError error = deserializeJson(doc, response);
 
         String successMessage = "Face comparison completed successfully";
@@ -156,8 +164,9 @@ void compareFace(WebsocketsMessage msg){
 bool livenessCheck(WebsocketsMessage msg){
 
     // String apiUrl = "http://10.252.9.240:8000/predict/"; // School
-    String apiUrl = "http://192.168.1.119:8000/predict/"; // Home
-    String result = "";
+    // String apiUrl = "http://192.168.1.119:8000/predict/"; // Home
+    // String apiUrl = "http://172.16.10.134:8000/predict/"; // Homies
+    String apiUrl = "http://192.168.43.56:8000/predict"; // Quynh
 
     HTTPClient http;
     http.begin(apiUrl);
@@ -207,7 +216,8 @@ bool authenticateFace(WebsocketsMessage msg) {
 
     HTTPClient http;
 
-    String apiUrl = "https://rxmieh048b.execute-api.ap-southeast-1.amazonaws.com/compare/" + bucketName + "/" + fileName;
+    String rekognitionCollectionId = "smartlock-" + userId + "-" + deviceId;
+    String apiUrl = "https://rxmieh048b.execute-api.ap-southeast-1.amazonaws.com/compare/" + bucketName + "/" + fileName + "?collection_id=" + rekognitionCollectionId;
     Serial.println("API URL: " + apiUrl);
 
     http.begin(apiUrl);
@@ -236,21 +246,33 @@ bool authenticateFace(WebsocketsMessage msg) {
 
             if (strcmp(message, successMessage.c_str()) == 0) {
                 Serial.println("Response: " + response);
+                if (doc.containsKey("faceId")) {
+                    faceId = doc["faceId"].as<String>();
+                    Serial.println("Face ID extracted: " + faceId);
+                } else {
+                    Serial.println("Warning: Response doesn't contain faceId");
+                    faceId = "unknown";
+                }
+                
                 parsingJSONResult(response, TFT_GREEN, "Authentication Success!", livenessCheckResult, failedAttempts);
                 resetFailedAttempts();
                 Serial.println("Face authentication successful");
+                
                 return true;
             } else if (strcmp(message, errorMessage.c_str()) == 0) {
                 Serial.println("Response: " + response);
+                faceId = ""; // Clear faceId on failed authentication
                 parsingJSONResult(response, TFT_RED, "No matching face found!", livenessCheckResult, failedAttempts);
                 incrementFailedAttempt();
                 return false;
             } else {
                 Serial.println("Unknown response: " + String(message));
+                faceId = ""; // Clear faceId on unknown response
                 return false;
             }
         } else {
             Serial.printf("HTTP Request Failed: %s\n", http.errorToString(httpResponseCode).c_str());
+            faceId = ""; // Clear faceId on HTTP error
             displayResult("Authentication Failed!", TFT_RED);
             return false;
         }

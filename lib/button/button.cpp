@@ -3,11 +3,17 @@
 extern String deviceId;
 extern String macAddress;
 extern String userId;
+extern String faceId;
 
 bool isNormalMode = true;
-bool lastButtonState = HIGH;
+bool lastButtonStateCapture = HIGH;
+bool lastButtonStateReset = HIGH;
 unsigned long lastCheck = 0;
 bool isFirstRun = true;
+
+// Variables for server-requested fingerprint enrollment are declared in mqtt.cpp
+extern bool pendingFingerprintEnroll;
+extern String pendingFaceId;
 
 unsigned long buttonPressStartTime = 0;
 uint8_t fingerprintMode = FINGERPRINT_SCAN_MODE;
@@ -30,12 +36,12 @@ bool buttonResetRead() {
 void buttonResetMode() {
     static unsigned long resetPressStartTime = 0;
     static bool isResetMode = false;
-    bool statusButtonPin = buttonResetRead();
+    bool statusButtonPinReset = buttonResetRead();
     
-    if (statusButtonPin == LOW && lastButtonState == HIGH) {
+    if (statusButtonPinReset == LOW && lastButtonStateReset == HIGH) {
         resetPressStartTime = millis();
         isResetMode = true;
-        lastButtonState = LOW;
+        lastButtonStateReset = LOW;
         Serial.println("Reset mode: Button pressed, waiting for 5 seconds...");
         
         String topicDeleteSubscribe = "server-delete/" + userId + "/" + deviceId;
@@ -45,12 +51,12 @@ void buttonResetMode() {
             Serial.println("Failed to subscribe to topic: " + topicDeleteSubscribe);
         }
     } 
-    else if (statusButtonPin == HIGH && lastButtonState == LOW) {
+    else if (statusButtonPinReset == HIGH && lastButtonStateReset == LOW) {
         isResetMode = false;
-        lastButtonState = HIGH;
+        lastButtonStateReset = HIGH;
         Serial.println("Reset mode: Button released before 5 seconds");
     }
-    else if (isResetMode && statusButtonPin == LOW) {
+    else if (isResetMode && statusButtonPinReset == LOW) {
         unsigned long pressDuration = millis() - resetPressStartTime;
         
         if (pressDuration >= RESET_PRESS_TIME) {
@@ -88,6 +94,129 @@ void checkFingerprintMode(DisplayResultCallback displayResultCallback) {
     }
 }
 
+void enrollFingerprint(DisplayResultCallback displayResultCallback) {
+    bool faceAuthenticated = faceAuthentication();
+
+    if (!faceAuthenticated) {
+        displayResultCallback("Face auth required!", TFT_ORANGE);
+        Serial.println("Face authentication required before fingerprint enrollment");
+        return;
+    }
+    
+    if (pendingFingerprintEnroll) {
+        Serial.println("Face authenticated, checking if face IDs match");
+        Serial.println("Authenticated Face ID: " + faceId);
+        Serial.println("Requested Face ID: " + pendingFaceId);
+        
+        if (faceId != pendingFaceId) {
+            Serial.println("Face ID mismatch! Cannot enroll fingerprint for different face");
+            displayResultCallback("Face ID mismatch!", TFT_RED);
+            
+            // Send failure to server
+            StaticJsonDocument<200> resultDoc;
+            resultDoc["userId"] = userId;
+            resultDoc["deviceId"] = deviceId;
+            resultDoc["faceId"] = pendingFaceId;
+            resultDoc["authenticatedFaceId"] = faceId;
+            resultDoc["mode"] = "ADD FINGERPRINT FAILED: FACE ID MISMATCH";
+            
+            String resultJson;
+            serializeJson(resultDoc, resultJson);
+            
+            extern void publishMessage(const char* topic, const char* message);
+            extern String topicAddFingerprintPublish;
+            publishMessage(topicAddFingerprintPublish.c_str(), resultJson.c_str());
+            Serial.println("Sent face ID mismatch error: " + resultJson);
+            
+            // Reset the pending state
+            pendingFingerprintEnroll = false;
+            pendingFaceId = "";
+            return;
+        }
+        
+        Serial.println("Face ID match confirmed, proceeding with fingerprint enrollment");
+    }
+    
+    isNormalMode = false;
+    fingerprintMode = FINGERPRINT_ENROLL_MODE;
+    
+    uint8_t newFingerID = getNextFreeID();
+    char message[50];
+    snprintf(message, sizeof(message), "Add Fingerprint ID: %d", newFingerID);
+    
+    displayResultCallback(message, TFT_GREEN);
+    
+    Serial.printf("Ready to enroll fingerprint with ID: %d\n", newFingerID);
+    
+    bool success = getFingerprintEnroll(newFingerID, displayResultCallback);
+    
+    // If this is a server-requested enrollment, send the result back
+    if (pendingFingerprintEnroll && success) {
+        // Get fingerprint template as base64
+        String fingerprintTemplate = getLatestFingerprintTemplateAsBase64(newFingerID);
+        
+        if (fingerprintTemplate.length() > 0) {
+            Serial.println("Successfully retrieved fingerprint template");
+            Serial.printf("Template length (base64): %d bytes\n", fingerprintTemplate.length());
+            
+            // Create a document with dynamic size based on template size
+            // Add extra space for metadata
+            size_t jsonCapacity = fingerprintTemplate.length() + 300;
+            DynamicJsonDocument resultDoc(jsonCapacity);
+            
+            resultDoc["fingerprintId"] = newFingerID;
+            resultDoc["fingerprintTemplate"] = fingerprintTemplate;
+            resultDoc["mode"] = "ADD FINGERPRINT SUCCESS";
+            
+            String resultJson;
+            serializeJson(resultDoc, resultJson);
+            
+            extern void publishMessage(const char* topic, const char* message);
+            extern String topicAddFingerprintPublish;
+            publishMessage(topicAddFingerprintPublish.c_str(), resultJson.c_str());
+            Serial.println("Sent enrollment result with template data");
+        } else {
+            Serial.println("Failed to retrieve fingerprint template");
+            
+            // Send basic success message without template
+            StaticJsonDocument<200> resultDoc;
+            resultDoc["fingerprintId"] = newFingerID;
+            resultDoc["mode"] = "ADD FINGERPRINT SUCCESS (NO TEMPLATE)";
+            
+            String resultJson;
+            serializeJson(resultDoc, resultJson);
+            
+            extern void publishMessage(const char* topic, const char* message);
+            extern String topicAddFingerprintPublish;
+            publishMessage(topicAddFingerprintPublish.c_str(), resultJson.c_str());
+            Serial.println("Sent enrollment result without template data");
+        }
+        
+        // Reset the pending state
+        pendingFingerprintEnroll = false;
+        pendingFaceId = "";
+    } else if (pendingFingerprintEnroll && !success) {
+        // Send failure to server
+        StaticJsonDocument<200> resultDoc;
+        resultDoc["userId"] = userId;
+        resultDoc["deviceId"] = deviceId;
+        resultDoc["faceId"] = pendingFaceId;
+        resultDoc["mode"] = "ADD FINGERPRINT FAILED";
+        
+        String resultJson;
+        serializeJson(resultDoc, resultJson);
+        
+        extern void publishMessage(const char* topic, const char* message);
+        extern String topicAddFingerprintPublish;
+        publishMessage(topicAddFingerprintPublish.c_str(), resultJson.c_str());
+        Serial.println("Sent enrollment failure: " + resultJson);
+        
+        // Reset the pending state
+        pendingFingerprintEnroll = false;
+        pendingFaceId = "";
+    }
+}
+
 void buttonEvent(
     HandleImageCallback handleImageCallback, 
     DisplayResultCallback displayResultCallback
@@ -96,7 +225,7 @@ void buttonEvent(
     static unsigned long pressStartTime = 0;
     static bool isButtonPressed = false;
     unsigned long newMillis = millis();
-    bool statusButtonPin = buttonCaptureImageRead();
+    bool statusButtonPinCapture = buttonCaptureImageRead();
 
     if (millis() - lastCheck < 100) {
         return;
@@ -104,27 +233,26 @@ void buttonEvent(
     lastCheck = millis();
     
     if (isFirstRun) {
-        lastButtonState = statusButtonPin;
+        lastButtonStateCapture = statusButtonPinCapture;
         isFirstRun = false;
         Serial.println("First run: Initializing button state to " + 
-                      String(lastButtonState == HIGH ? "HIGH (not pressed)" : "LOW (pressed)"));
+                      String(lastButtonStateCapture == HIGH ? "HIGH (not pressed)" : "LOW (pressed)"));
         lastMillis = newMillis;
         return;
     }
 
     if (newMillis - lastMillis > 50) { 
 
-        if (statusButtonPin == LOW && lastButtonState == HIGH) {
+        if (statusButtonPinCapture == LOW && lastButtonStateCapture == HIGH) {
 
-            lastButtonState = LOW;
+            lastButtonStateCapture = LOW;
             pressStartTime = newMillis;
             isButtonPressed = true;
             Serial.println("Button pressed at: " + String(pressStartTime) + " ms");
 
+        } else if (statusButtonPinCapture == HIGH && lastButtonStateCapture == LOW) {
 
-        } else if (statusButtonPin == HIGH && lastButtonState == LOW) {
-
-            lastButtonState = HIGH;
+            lastButtonStateCapture = HIGH;
             unsigned long pressDuration = newMillis - pressStartTime;
             
             Serial.println("Button released. Press duration: " + String(pressDuration) + " ms");
@@ -139,30 +267,28 @@ void buttonEvent(
                 return;
             }
 
+            // Check for pending fingerprint enrollment request
+            extern bool pendingFingerprintEnroll;
+            extern String pendingFaceId;
+            
+            if (pendingFingerprintEnroll) {
+                Serial.println("Processing pending fingerprint enrollment request");
+                displayResultCallback("Authenticating face...", TFT_ORANGE);
+                
+                // This will trigger face authentication
+                // enrollFingerprint handles the face authentication internally
+                enrollFingerprint(displayResultCallback);
+                
+                // After face authentication and fingerprint enrollment, reset the pending state
+                pendingFingerprintEnroll = false;
+                pendingFaceId = "";
+                return;
+            }
+
+            // Long press to add fingerprint
             if (pressDuration >= LONG_PRESS_TIME) {
-
                 Serial.println("Long press detected: Add Fingerprint");
-
-                bool faceAuthenticated = faceAuthentication();
-
-                if (!faceAuthenticated) {
-                    displayResultCallback("Face auth required!", TFT_ORANGE);
-                    Serial.println("Face authentication required before fingerprint enrollment");
-                    return;
-                }
-                
-                isNormalMode = false;
-                fingerprintMode = FINGERPRINT_ENROLL_MODE;
-                
-                uint8_t newFingerID = getNextFreeID();
-                char message[50];
-                snprintf(message, sizeof(message), "Add Fingerprint ID: %d", newFingerID);
-                
-                displayResultCallback(message, TFT_GREEN);
-                
-                Serial.printf("Ready to enroll fingerprint with ID: %d\n", newFingerID);
-                
-                getFingerprintEnroll(newFingerID, displayResultCallback);
+                enrollFingerprint(displayResultCallback);
             } else {
                 Serial.println("Short press detected: Capture Image");
                 handleImageCallback();

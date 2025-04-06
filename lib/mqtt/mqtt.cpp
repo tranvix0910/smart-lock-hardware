@@ -4,12 +4,18 @@ extern String deviceId;
 extern String macAddress;
 extern String userId;
 
+// Variables for server-requested fingerprint enrollment - defined here
+bool pendingFingerprintEnroll = false;
+String pendingFaceId = "";
+
 WiFiClientSecure net;
 PubSubClient AWSIoTClient(net);
 bool deviceVerified = false;
 
 String topicPublish;
 String topicSubscribe;
+String topicAddFingerprintPublish;
+String topicAddFingerprintSubscribe;
 
 bool subscribeTopic(const char* topic) {
     if (AWSIoTClient.subscribe(topic)) {
@@ -164,7 +170,53 @@ void handleMessage(char* topic, byte* payload, unsigned int length) {
             Serial.println("No confirmation received from server");
         }
     }
-    // Change state message
+
+    if(topicString.startsWith("addFingerprint-server/")) {
+        Serial.println("Received fingerprint addition request");
+        
+        if (doc.containsKey("mode") && 
+            doc.containsKey("userId") && 
+            doc.containsKey("deviceId") && 
+            doc.containsKey("faceId")) {
+            
+            String modeReceived = doc["mode"].as<String>();
+            String receivedUserId = doc["userId"].as<String>();
+            String receivedDeviceId = doc["deviceId"].as<String>();
+            String faceIdReceived = doc["faceId"].as<String>();
+            
+            if (modeReceived == "ADD FINGERPRINT REQUEST FROM SERVER" && 
+                receivedUserId == userId && 
+                receivedDeviceId == deviceId) {
+                
+                Serial.println("Valid fingerprint addition request received");
+                Serial.println("Face ID: " + faceIdReceived);
+                
+                // Set the pending flag and store the face ID
+                pendingFingerprintEnroll = true;
+                pendingFaceId = faceIdReceived;
+                
+                // Send acknowledgment
+                StaticJsonDocument<200> responseDoc;
+                responseDoc["userId"] = userId;
+                responseDoc["deviceId"] = deviceId;
+                responseDoc["faceId"] = faceIdReceived;
+                responseDoc["mode"] = "ADD FINGERPRINT REQUEST ACCEPTED";
+                
+                displayResult("Fingerprint enrollment requested\nPress button to authenticate face", TFT_BLUE);
+                
+                String responseJson;
+                serializeJson(responseDoc, responseJson);
+                
+                publishMessage(topicAddFingerprintPublish.c_str(), responseJson.c_str());
+                Serial.println("Sent acknowledgment: " + responseJson);
+            } else {
+                Serial.println("Invalid request or not for this device");
+            }
+        } else {
+            Serial.println("Missing required fields in request");
+        }
+    }
+
     if (doc.containsKey("deviceId") && doc.containsKey("userId") && doc.containsKey("lockState")) {
         const char* receivedDeviceId = doc["deviceId"];
         const char* receivedUserId = doc["userId"];
@@ -203,20 +255,14 @@ bool connectToAWSIoTCore() {
 
     topicPublish = "smartlock/" + String(userId) + "/" + String(deviceId);
     topicSubscribe = "server/" + String(userId) + "/" + String(deviceId);
+    topicAddFingerprintPublish = "addFingerprint-smartlock/" + String(userId) + "/" + String(deviceId);
+    topicAddFingerprintSubscribe = "addFingerprint-server/" + String(userId) + "/" + String(deviceId);
 
     subscribeTopic(topicSubscribe.c_str());
+    subscribeTopic(topicAddFingerprintSubscribe.c_str());
     
     Serial.println("AWS IoT Connected!");
     return true;
-    
-    // createSubscribeTopic();
-    // if (AWSIoTClient.subscribe(TOPIC_SUBSCRIBE)) {
-    //     Serial.print("Subscribed to topic: ");
-    //     Serial.println(TOPIC_SUBSCRIBE);
-    // } else {
-    //     Serial.println("Failed to subscribe to topic!");
-    // }
-    
 }
 
 void reconnect() {
@@ -225,12 +271,8 @@ void reconnect() {
         if (AWSIoTClient.connect(THINGNAME)) {
             Serial.println("connected");
             subscribeTopic(topicSubscribe.c_str());
-            if (AWSIoTClient.subscribe(topicSubscribe.c_str())) {
-                Serial.print("Subscribed to topic: ");
-                Serial.println(topicSubscribe.c_str());
-            } else {
-                Serial.println("Failed to subscribe to topic!");
-            }
+            subscribeTopic(topicAddFingerprintSubscribe.c_str());
+            Serial.println("Subscribed to topics");
         } else {
             Serial.print("failed, rc=");
             Serial.print(AWSIoTClient.state());

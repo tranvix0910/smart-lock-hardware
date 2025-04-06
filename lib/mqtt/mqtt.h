@@ -8,8 +8,17 @@
 #include "secrets.h"
 #include "lock.h"
 
+// Topic strings
 extern String topicPublish;
 extern String topicSubscribe;
+extern String topicAddFingerprintPublish;
+extern String topicAddFingerprintSubscribe;
+
+// Fingerprint enrollment variables
+extern bool pendingFingerprintEnroll;
+extern String pendingFaceId;
+
+extern void displayResult(String message, uint16_t color);
 
 bool connectToAWSIoTCore();
 bool subscribeTopic(const char* topic);

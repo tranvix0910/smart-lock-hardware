@@ -6,6 +6,7 @@
 #include <TFT_eSPI.h>
 #include "lock.h"
 #include "user_interface.h"
+#include <base64.h>
 
 #define RX_PIN 16 // GREEN
 #define TX_PIN 17 // WHITE
@@ -24,5 +25,6 @@ bool deleteAllFingerprints(DisplayResultCallback displayResultCallback);
 bool deleteFingerprint(uint8_t id, DisplayResultCallback displayResultCallback);
 bool isFingerIDFree(uint8_t id);
 int getNextFreeID();
+String getLatestFingerprintTemplateAsBase64(uint8_t fingerprintID);
 
 #endif
