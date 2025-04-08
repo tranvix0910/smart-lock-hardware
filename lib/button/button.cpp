@@ -114,8 +114,6 @@ void enrollFingerprint(DisplayResultCallback displayResultCallback) {
             
             // Send failure to server
             StaticJsonDocument<200> resultDoc;
-            resultDoc["userId"] = userId;
-            resultDoc["deviceId"] = deviceId;
             resultDoc["faceId"] = pendingFaceId;
             resultDoc["authenticatedFaceId"] = faceId;
             resultDoc["mode"] = "ADD FINGERPRINT FAILED: FACE ID MISMATCH";
@@ -198,8 +196,6 @@ void enrollFingerprint(DisplayResultCallback displayResultCallback) {
     } else if (pendingFingerprintEnroll && !success) {
         // Send failure to server
         StaticJsonDocument<200> resultDoc;
-        resultDoc["userId"] = userId;
-        resultDoc["deviceId"] = deviceId;
         resultDoc["faceId"] = pendingFaceId;
         resultDoc["mode"] = "ADD FINGERPRINT FAILED";
         
@@ -214,6 +210,88 @@ void enrollFingerprint(DisplayResultCallback displayResultCallback) {
         // Reset the pending state
         pendingFingerprintEnroll = false;
         pendingFaceId = "";
+    }
+}
+
+void processDeleteFingerprint(uint8_t id, DisplayResultCallback displayResultCallback) {
+    bool faceAuthenticated = faceAuthentication();
+
+    if (!faceAuthenticated) {
+        displayResultCallback("Face auth required!", TFT_ORANGE);
+        Serial.println("Face authentication required before fingerprint deletion");
+        return;
+    }
+    
+    if (pendingDeleteFingerprint) {
+        Serial.println("Face authenticated, checking if face IDs match");
+        Serial.println("Authenticated Face ID: " + faceId);
+        Serial.println("Requested Face ID: " + pendingDeleteFaceId);
+        
+        if (faceId != pendingDeleteFaceId) {
+            Serial.println("Face ID mismatch! Cannot delete fingerprint for different face");
+            displayResultCallback("Face ID mismatch!", TFT_RED);
+            
+            // Send failure to server
+            StaticJsonDocument<200> resultDoc;
+            resultDoc["faceId"] = pendingDeleteFaceId;
+            resultDoc["authenticatedFaceId"] = faceId;
+            resultDoc["fingerprintId"] = pendingDeleteFingerprintId;
+            resultDoc["mode"] = "DELETE FINGERPRINT FAILED: FACE ID MISMATCH";
+            
+            String resultJson;
+            serializeJson(resultDoc, resultJson);
+            
+            extern void publishMessage(const char* topic, const char* message);
+            String topicDeleteFingerprintPublish = "deleteFingerprint-smartlock/" + String(userId) + "/" + String(deviceId);
+            publishMessage(topicDeleteFingerprintPublish.c_str(), resultJson.c_str());
+            Serial.println("Sent face ID mismatch error: " + resultJson);
+            
+            // Reset the pending state
+            pendingDeleteFingerprint = false;
+            pendingDeleteFaceId = "";
+            pendingDeleteFingerprintId = -1;
+            return;
+        }
+        
+        Serial.println("Face ID match confirmed, proceeding with fingerprint deletion");
+    }
+    
+    // Proceed with fingerprint deletion
+    char message[50];
+    snprintf(message, sizeof(message), "Deleting Fingerprint ID: %d", id);
+    displayResultCallback(message, TFT_CYAN);
+    
+    Serial.printf("Deleting fingerprint with ID: %d\n", id);
+    
+    bool success = deleteFingerprint(id, displayResultCallback);
+    
+    // If this was a server-requested deletion, send the result back
+    if (pendingDeleteFingerprint) {
+        // Send result to server
+        StaticJsonDocument<200> resultDoc;
+        resultDoc["faceId"] = pendingDeleteFaceId;
+        resultDoc["fingerprintId"] = pendingDeleteFingerprintId;
+        
+        if (success) {
+            resultDoc["mode"] = "DELETE FINGERPRINT SUCCESS";
+            displayResultCallback("Fingerprint deleted!", TFT_GREEN);
+        } else {
+            resultDoc["mode"] = "DELETE FINGERPRINT FAILED";
+            displayResultCallback("Deletion failed!", TFT_RED);
+        }
+        
+        String resultJson;
+        serializeJson(resultDoc, resultJson);
+        
+        extern void publishMessage(const char* topic, const char* message);
+        String topicDeleteFingerprintPublish = "deleteFingerprint-smartlock/" + String(userId) + "/" + String(deviceId);
+        publishMessage(topicDeleteFingerprintPublish.c_str(), resultJson.c_str());
+        Serial.println("Sent deletion result: " + resultJson);
+        
+        // Reset the pending state
+        pendingDeleteFingerprint = false;
+        pendingDeleteFaceId = "";
+        pendingDeleteFingerprintId = -1;
     }
 }
 
@@ -271,7 +349,20 @@ void buttonEvent(
             extern bool pendingFingerprintEnroll;
             extern String pendingFaceId;
             
-            if (pendingFingerprintEnroll) {
+            // Check for pending fingerprint deletion request
+            extern bool pendingDeleteFingerprint;
+            extern String pendingDeleteFaceId;
+            extern int pendingDeleteFingerprintId;
+            
+            if (pendingDeleteFingerprint) {
+                Serial.println("Processing pending fingerprint deletion request");
+                displayResultCallback("Authenticating face...", TFT_ORANGE);
+                
+                // Gọi hàm xử lý xóa vân tay
+                processDeleteFingerprint(pendingDeleteFingerprintId, displayResultCallback);
+                
+                return;
+            } else if (pendingFingerprintEnroll) {
                 Serial.println("Processing pending fingerprint enrollment request");
                 displayResultCallback("Authenticating face...", TFT_ORANGE);
                 

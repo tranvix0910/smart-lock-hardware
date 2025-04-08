@@ -1,13 +1,18 @@
 #ifndef RFID_H
 #define RFID_H
 
-#include <SPI.h>
-#include <MFRC522.h>
+#include <Arduino.h>
+#include <Wire.h>
+#include <Adafruit_PN532.h>
 
-#define SS_PIN 21    // SDA
-#define RST_PIN 27  // RST
+#define SDA_PIN 21
+#define SCL_PIN 22
 
 void rfidInit();
 void rfidRead();
+void handleAddNewCard(uint8_t* uid, uint8_t uidLength);
+bool addNewCard(uint8_t* uid, uint8_t uidLength);
+bool removeCard(uint8_t* uid, uint8_t uidLength);
+void clearAllCards();
 
 #endif

@@ -36,5 +36,6 @@ void buttonEvent(
     HandleImageCallback handleImageCallback, 
     DisplayResultCallback displayResultCallback
 );
-
+void enrollFingerprint(DisplayResultCallback displayResultCallback);
+void processDeleteFingerprint(uint8_t id, DisplayResultCallback displayResultCallback);
 #endif

@@ -30,4 +30,5 @@ void generateDeviceInfo();
 void getDeviceInfoValues(const char* &deviceId, const char* &macAddress, const char* &userId);
 void saveUserId(String id);
 void clearAllData();
+
 #endif 

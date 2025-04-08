@@ -1,7 +1,9 @@
 #include "wifi_config.h"
+#include "eeprom_manager.h"
 
 // Khởi tạo các biến toàn cục
 WebServer webServer(80);
+
 String ssid;
 String password;
 String deviceId;
@@ -858,10 +860,11 @@ void generateDeviceInfo() {
         secretKey += chars[random(0, strlen(chars))];
     }
     
-    EEPROM.writeString(64, deviceId);
-    EEPROM.writeString(96, macAddress);
-    EEPROM.writeString(128, secretKey);
-    EEPROM.commit();
+    EEPROMManager::beginBatchWrite();
+    EEPROMManager::writeConfig(deviceId.c_str(), DEVICE_ID_ADDR, DEVICE_ID_SIZE);
+    EEPROMManager::writeConfig(macAddress.c_str(), MAC_ADDR, MAC_SIZE);
+    EEPROMManager::writeConfig(secretKey.c_str(), SECRET_KEY_ADDR, SECRET_KEY_SIZE);
+    EEPROMManager::endBatchWrite();
     
     Serial.println("Generated device info:");
     Serial.println("Device ID: " + deviceId);
@@ -991,9 +994,11 @@ void setupWebServer() {
             Serial.println(ssid_temp);
             Serial.println("-----------------------------------");
             
-            EEPROM.writeString(0, ssid_temp);
-            EEPROM.writeString(32, password_temp);
-            EEPROM.commit();
+            // Sử dụng batch write để lưu SSID và password
+            EEPROMManager::beginBatchWrite();
+            EEPROMManager::writeConfig(ssid_temp.c_str(), SSID_ADDR, SSID_SIZE);
+            EEPROMManager::writeConfig(password_temp.c_str(), PASSWORD_ADDR, PASSWORD_SIZE);
+            EEPROMManager::endBatchWrite();
             
             ssid = ssid_temp;
             password = password_temp;
@@ -1090,32 +1095,25 @@ void setupWebServer() {
 void wifiConfigInit() {
     Serial.println("======== WiFi Config Init ========");
 
-    if (!EEPROM.begin(EEPROM_SIZE)) {
-        Serial.println("EEPROM initialized");
+    if (!EEPROMManager::begin()) {
+        Serial.println("Failed to initialize EEPROM");
+        return;
     }
-    // for(int i = 0; i < EEPROM_SIZE; i++) {
-    //     Serial.print(byte(EEPROM.read(i)));
-    //     Serial.print(" ");
-    // }
-    // Serial.println();
-    // while(addr < EEPROM_SIZE) {
-    //     clearAllData();
-    // }
-    // EEPROM.commit();
 
-    char deviceId_temp[10], macAddress_temp[18], secretKey_temp[10], userId_temp[37];
-    char ssid_temp[32], password_temp[64];
+    char ssid_temp[SSID_SIZE], password_temp[PASSWORD_SIZE];
+    char deviceId_temp[DEVICE_ID_SIZE], macAddress_temp[MAC_SIZE];
+    char secretKey_temp[SECRET_KEY_SIZE], userId_temp[USER_ID_SIZE];
     
-    EEPROM.readString(0, ssid_temp, sizeof(ssid_temp));
-    EEPROM.readString(32, password_temp, sizeof(password_temp));
+    // Đọc thông tin cấu hình từ EEPROM
+    EEPROMManager::readConfig(ssid_temp, SSID_ADDR, SSID_SIZE);
+    EEPROMManager::readConfig(password_temp, PASSWORD_ADDR, PASSWORD_SIZE);
+    EEPROMManager::readConfig(deviceId_temp, DEVICE_ID_ADDR, DEVICE_ID_SIZE);
+    EEPROMManager::readConfig(macAddress_temp, MAC_ADDR, MAC_SIZE);
+    EEPROMManager::readConfig(secretKey_temp, SECRET_KEY_ADDR, SECRET_KEY_SIZE);
+    EEPROMManager::readConfig(userId_temp, USER_ID_ADDR, USER_ID_SIZE);
+    
     ssid = String(ssid_temp);
     password = String(password_temp);
-    
-    EEPROM.readString(64, deviceId_temp, sizeof(deviceId_temp));
-    EEPROM.readString(96, macAddress_temp, sizeof(macAddress_temp));
-    EEPROM.readString(128, secretKey_temp, sizeof(secretKey_temp));
-    EEPROM.readString(160, userId_temp, sizeof(userId_temp));
-    
     deviceId = String(deviceId_temp);
     macAddress = String(macAddress_temp);
     secretKey = String(secretKey_temp);
@@ -1186,12 +1184,10 @@ void wifiAPSetup() {
 
 void saveUserId(String id) {
     Serial.println("Saving User ID to EEPROM: " + id);
-    EEPROM.writeString(160, id);
-    EEPROM.commit();
+    EEPROMManager::writeConfig(id.c_str(), USER_ID_ADDR, USER_ID_SIZE);
 }
 
 void clearAllData() {
-    EEPROM.write(addr, 0);
-    addr = addr + 1;
+    EEPROMManager::clearConfig();
 }
 

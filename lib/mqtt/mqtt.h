@@ -18,7 +18,14 @@ extern String topicAddFingerprintSubscribe;
 extern bool pendingFingerprintEnroll;
 extern String pendingFaceId;
 
+// Fingerprint deletion variables
+extern bool pendingDeleteFingerprint;
+extern String pendingDeleteFaceId;
+extern int pendingDeleteFingerprintId;
+
+// External functions
 extern void displayResult(String message, uint16_t color);
+extern bool deleteFingerprintProcess(uint8_t id, void (*displayCallback)(String, uint16_t));
 
 bool connectToAWSIoTCore();
 bool subscribeTopic(const char* topic);

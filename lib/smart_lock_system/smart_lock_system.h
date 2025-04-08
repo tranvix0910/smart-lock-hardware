@@ -2,8 +2,13 @@
 #define SMART_DOOR_SYSTEM_H
 
 #include <Arduino.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #define TIME_DELAY 1000
+
+extern TaskHandle_t rfidTask;
+extern TaskHandle_t webSocketTask;
 
 void smartLockSystemInit();
 void smartLockSystemUpdate();

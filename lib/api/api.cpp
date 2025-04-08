@@ -163,10 +163,10 @@ void compareFace(WebsocketsMessage msg){
 
 bool livenessCheck(WebsocketsMessage msg){
 
-    // String apiUrl = "http://10.252.9.240:8000/predict/"; // School
-    // String apiUrl = "http://192.168.1.119:8000/predict/"; // Home
-    // String apiUrl = "http://172.16.10.134:8000/predict/"; // Homies
-    String apiUrl = "http://192.168.43.56:8000/predict"; // Quynh
+    // String apiUrl = "http://10.252.9.240:8000/predict"; // School
+    String apiUrl = "http://192.168.1.119:8000/predict"; // Home
+    // String apiUrl = "http://172.16.10.134:8000/predict"; // Homies
+    // String apiUrl = "http://192.168.43.56:8000/predict"; // Quynh
 
     HTTPClient http;
     http.begin(apiUrl);
