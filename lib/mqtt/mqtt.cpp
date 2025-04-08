@@ -8,6 +8,11 @@ extern String userId;
 bool pendingFingerprintEnroll = false;
 String pendingFaceId = "";
 
+// Variables for server-requested fingerprint deletion
+bool pendingDeleteFingerprint = false;
+String pendingDeleteFaceId = "";
+int pendingDeleteFingerprintId = -1;
+
 WiFiClientSecure net;
 PubSubClient AWSIoTClient(net);
 bool deviceVerified = false;
@@ -16,6 +21,8 @@ String topicPublish;
 String topicSubscribe;
 String topicAddFingerprintPublish;
 String topicAddFingerprintSubscribe;
+String topicDeleteFingerprintPublish;
+String topicDeleteFingerprintSubscribe;
 
 bool subscribeTopic(const char* topic) {
     if (AWSIoTClient.subscribe(topic)) {
@@ -217,6 +224,86 @@ void handleMessage(char* topic, byte* payload, unsigned int length) {
         }
     }
 
+    if(topicString.startsWith("deleteFingerprint-server/")) {
+        Serial.println("Received fingerprint deletion request");
+        
+        if (doc.containsKey("mode") && 
+            doc.containsKey("faceId") &&
+            doc.containsKey("fingerprintId")) {
+            
+            String modeReceived = doc["mode"].as<String>();
+            String requestedFaceId = doc["faceId"].as<String>();
+            String fingerprintIdStr = doc["fingerprintId"].as<String>();
+            
+            if (modeReceived == "DELETE FINGERPRINT REQUEST FROM SERVER") {
+                Serial.printf("Processing delete request for fingerprint ID: %s, Face ID: %s\n", 
+                             fingerprintIdStr.c_str(), requestedFaceId.c_str());
+                
+                // Yêu cầu xác thực khuôn mặt
+                Serial.println("Face authentication required before fingerprint deletion");
+                displayResult("Press button to proceed", TFT_BLUE);
+                delay(3000);
+                
+                // Lưu thông tin yêu cầu để xử lý sau khi xác thực khuôn mặt
+                pendingDeleteFingerprint = true;
+                pendingDeleteFaceId = requestedFaceId;
+                pendingDeleteFingerprintId = fingerprintIdStr.toInt();
+                
+                // Gửi phản hồi cho server biết hệ thống đang đợi xác thực
+                StaticJsonDocument<200> responseDoc;
+                responseDoc["faceId"] = requestedFaceId;
+                responseDoc["fingerprintId"] = fingerprintIdStr;
+                responseDoc["mode"] = "DELETE FINGERPRINT ACCEPTED";
+                
+                String responseJson;
+                serializeJson(responseDoc, responseJson);
+                
+                String topicDeleteFingerprintPublish = "deleteFingerprint-smartlock/" + String(userId) + "/" + String(deviceId);
+                publishMessage(topicDeleteFingerprintPublish.c_str(), responseJson.c_str());
+                Serial.println("Sent waiting for authentication response: " + responseJson);
+            } else {
+                Serial.println("Invalid mode received");
+            }
+        } else {
+            Serial.println("Missing required fields in fingerprint deletion request");
+        }
+    }
+
+    if(topicString.startsWith("addRFIDCard-server/")) {
+        if(doc.containsKey("mode") && doc.containsKey("faceId") && doc.containsKey("rfidCardId")) {
+            String modeReceived = doc["mode"].as<String>();
+            String receivedFaceId = doc["faceId"].as<String>();
+            String rfidCardIdReceived = doc["rfidCardId"].as<String>();
+            
+            if(modeReceived == "ADD RFID CARD REQUEST FROM SERVER") {
+                Serial.println("Received RFID card addition request");
+                Serial.println("Face ID: " + receivedFaceId);
+                Serial.println("RFID Card ID: " + rfidCardIdReceived);
+                
+                // Set the pending flag and store the face ID
+                // pendingRFIDEnroll = true;
+                // pendingRFIDCardId = rfidCardIdReceived;
+                
+                // Send acknowledgment
+                StaticJsonDocument<200> responseDoc;
+                responseDoc["faceId"] = receivedFaceId;
+                responseDoc["rfidCardId"] = rfidCardIdReceived;
+                responseDoc["mode"] = "ADD RFID CARD REQUEST ACCEPTED";
+                
+                String responseJson;
+                serializeJson(responseDoc, responseJson);
+                
+                String topicAddRFIDCardPublish = "addRFIDCard-smartlock/" + String(userId) + "/" + String(deviceId);
+                publishMessage(topicAddRFIDCardPublish.c_str(), responseJson.c_str());
+                Serial.println("Sent acknowledgment: " + responseJson);
+            } else {
+                Serial.println("Invalid request or not for this device");
+            }
+        } else {
+            Serial.println("Missing required fields in request");
+        }
+    }
+
     if (doc.containsKey("deviceId") && doc.containsKey("userId") && doc.containsKey("lockState")) {
         const char* receivedDeviceId = doc["deviceId"];
         const char* receivedUserId = doc["userId"];
@@ -257,9 +344,11 @@ bool connectToAWSIoTCore() {
     topicSubscribe = "server/" + String(userId) + "/" + String(deviceId);
     topicAddFingerprintPublish = "addFingerprint-smartlock/" + String(userId) + "/" + String(deviceId);
     topicAddFingerprintSubscribe = "addFingerprint-server/" + String(userId) + "/" + String(deviceId);
+    String topicDeleteFingerprintSubscribe = "deleteFingerprint-server/" + String(userId) + "/" + String(deviceId);
 
     subscribeTopic(topicSubscribe.c_str());
     subscribeTopic(topicAddFingerprintSubscribe.c_str());
+    subscribeTopic(topicDeleteFingerprintSubscribe.c_str());
     
     Serial.println("AWS IoT Connected!");
     return true;
@@ -272,6 +361,10 @@ void reconnect() {
             Serial.println("connected");
             subscribeTopic(topicSubscribe.c_str());
             subscribeTopic(topicAddFingerprintSubscribe.c_str());
+            
+            String topicDeleteFingerprintSubscribe = "deleteFingerprint-server/" + String(userId) + "/" + String(deviceId);
+            subscribeTopic(topicDeleteFingerprintSubscribe.c_str());
+            
             Serial.println("Subscribed to topics");
         } else {
             Serial.print("failed, rc=");

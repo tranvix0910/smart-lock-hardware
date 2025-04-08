@@ -195,6 +195,8 @@ uint8_t getFingerprintEnroll(int id, DisplayResultCallback displayResultCallback
     Serial.println("Stored!");
     snprintf(message, sizeof(message), "ID #%d stored!", id);
     displayResultCallback(message, TFT_GREEN);
+    delay(3000);
+    isNormalMode = true;
   } else if (p == FINGERPRINT_PACKETRECIEVEERR) {
     Serial.println("Communication error");
     displayResultCallback("Communication error", TFT_RED);
