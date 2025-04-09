@@ -9,25 +9,54 @@
 #include "mqtt.h"
 #include "alert.h"
 
-// Khai báo task handles
 TaskHandle_t rfidTask = NULL;
 TaskHandle_t webSocketTask = NULL;
+TaskHandle_t buttonTask = NULL;
+TaskHandle_t rfidModeTask = NULL;
+TaskHandle_t fingerprintModeTask = NULL;
 
 // Hàm xử lý task RFID
-void rfidTaskFunction(void *parameter) {
-    for(;;) {
-        rfidRead();
-        // Delay 100ms
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-    }
-}
+// void rfidTaskFunction(void *parameter) {
+//     for(;;) {
+//         rfidRead();
+//         // Delay 100ms
+//         vTaskDelay(100 / portTICK_PERIOD_MS);
+//     }
+// }
 
-// Hàm xử lý task WebSocket
 void webSocketTaskFunction(void *parameter) {
     for(;;) {
         websocketHandle();
-        // Delay 50ms
         vTaskDelay(50 / portTICK_PERIOD_MS);
+    }
+}
+
+void buttonTaskFunction(void *parameter) {
+    ButtonEvent evt;
+    for(;;) {
+        if(xQueueReceive(buttonEventQueue, &evt, portMAX_DELAY) == pdTRUE) {
+            if(xSemaphoreTake(wsMutex, portMAX_DELAY) == pdTRUE) {
+                buttonEvent(evt.handleImg, evt.displayRes);
+                xSemaphoreGive(wsMutex);
+            }
+        }
+        vTaskDelay(10 / portTICK_PERIOD_MS);
+    }
+}
+
+// Hàm xử lý task RFID Mode
+// void rfidModeTaskFunction(void *parameter) {
+//     for(;;) {
+//         checkRFIDMode(displayResult);
+//         // Delay 100ms
+//         vTaskDelay(100 / portTICK_PERIOD_MS);
+//     }
+// }
+
+void fingerprintModeTaskFunction(void *parameter) {
+    for(;;) {
+        checkFingerprintMode(displayResult);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }
 
@@ -35,6 +64,7 @@ void smartLockSystemInit() {
     Serial.begin(115200);
     delay(TIME_DELAY);
     
+    Serial.println("Initializing WiFi...");
     wifiConfigInit();
     while (wifiMode != 1) {
         wifiConfigRun();
@@ -43,48 +73,76 @@ void smartLockSystemInit() {
     
     Serial.println("WiFi connected successfully, initializing other modules...");
     
-    // Initialize display
+    Serial.println("Initializing basic hardware...");
     displayInit();
-    // Initialize WiFi AP
     wifiAPSetup();
-    // Initialize websocket
     websocketInit();
-    // Initialize MQTT
+    
+    Serial.println("Initializing cloud communication...");
     connectToAWSIoTCore();
-    // Initialize fingerprint
-    fingerprintInit();
-    // Initialize RFID
-    rfidInit();
-    // Initialize motion detect
-    motionDetectBegin();
-    // Initialize magnetic hall
-    magneticHallInit();
-    // Initialize button capture image
+    
+    Serial.println("Initializing security sensors...");
+    fingerprintInit();     
+    // rfidInit();             // RFID
+    motionDetectBegin();    
+    magneticHallInit();     
+    
+    Serial.println("Initializing other components...");
     buttonInit();
-    // Initialize lock
     lockInit();
-    // Initialize buzzer
     alertInit();
     
-    // Tạo task cho RFID
+    Serial.println("Creating RTOS tasks...");
+    
+    // Tạo task cho RFID đọc thẻ (ưu tiên thấp)
+    // xTaskCreate(
+    //     rfidTaskFunction,    
+    //     "RFID Task",         
+    //     4096,                
+    //     NULL,                
+    //     1,                   // Mức ưu tiên thấp nhất
+    //     &rfidTask            
+    // );
+
     xTaskCreate(
-        rfidTaskFunction,    // Hàm task
-        "RFID Task",         // Tên task
-        4096,                // Kích thước stack
-        NULL,                // Tham số
-        1,                   // Mức ưu tiên (1 là thấp nhất)
-        &rfidTask            // Task handle
+        webSocketTaskFunction,
+        "WebSocket Task",     
+        8192,
+        NULL,                  
+        2,
+        &webSocketTask        
+    );
+
+    xTaskCreate(
+        buttonTaskFunction,
+        "Button Task",
+        4096,
+        NULL,
+        3,
+        &buttonTask
     );
     
-    // Tạo task cho WebSocket
+    // Tạo task cho RFID Mode (nhận diện thẻ để mở khóa)
+    // xTaskCreate(
+    //     rfidModeTaskFunction,
+    //     "RFID Mode Task",
+    //     4096,
+    //     NULL,
+    //     2,                    // Ưu tiên trung bình
+    //     &rfidModeTask
+    // );
+    
+
     xTaskCreate(
-        webSocketTaskFunction, // Hàm task
-        "WebSocket Task",      // Tên task
-        8192,                  // Kích thước stack lớn hơn vì xử lý hình ảnh
-        NULL,                  // Tham số
-        2,                     // Mức ưu tiên cao hơn RFID
-        &webSocketTask         // Task handle
+        fingerprintModeTaskFunction,
+        "Fingerprint Mode Task",
+        4096,
+        NULL,
+        2,
+        &fingerprintModeTask
     );
+    
+    Serial.println("Smart Lock System initialization complete!");
 }
 
 void smartLockSystemUpdate() {
@@ -93,17 +151,14 @@ void smartLockSystemUpdate() {
         return;
     }
     
-    // Không cần gọi rfidRead() và websocketHandle() ở đây nữa
-    // vì đã được xử lý trong các task riêng
+    // - rfidRead() -> rfidTaskFunction
+    // - websocketHandle() -> webSocketTaskFunction
+    // - checkFingerprintMode() -> fingerprintModeTaskFunction
+    // - checkRFIDMode() -> rfidModeTaskFunction
     
     // Motion Detection
     displayCheckMotion();
-    // Lock
     lockUpdate();
-    // Check and process fingerprint if in scan mode
-    checkFingerprintMode(displayResult);
-    // check button reset mode
     buttonResetMode();
-    // MQTT
     clientLoop();
 }

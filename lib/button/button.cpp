@@ -1,9 +1,15 @@
 #include "button.h"
+#include "rfid.h"
 
 extern String deviceId;
 extern String macAddress;
 extern String userId;
 extern String faceId;
+
+extern String topicAddFingerprintPublish;
+extern String topicDeleteFingerprintPublish;
+
+extern void publishMessage(const char* topic, const char* message);
 
 bool isNormalMode = true;
 bool lastButtonStateCapture = HIGH;
@@ -14,6 +20,12 @@ bool isFirstRun = true;
 // Variables for server-requested fingerprint enrollment are declared in mqtt.cpp
 extern bool pendingFingerprintEnroll;
 extern String pendingFaceId;
+
+// Variables for server-requested RFID enrollment are declared in mqtt.cpp
+extern bool pendingRFIDEnroll;
+extern String pendingRFIDFaceId;
+
+extern String failedRFIDEnroll;
 
 unsigned long buttonPressStartTime = 0;
 uint8_t fingerprintMode = FINGERPRINT_SCAN_MODE;
@@ -70,7 +82,6 @@ void buttonResetMode() {
             String topicDelete = "smartlock-delete/" + userId + "/" + deviceId;
             String jsonString;
             serializeJson(doc, jsonString);
-            
             publishMessage(topicDelete.c_str(), jsonString.c_str());
             Serial.println("Delete request sent: " + jsonString);
             Serial.println("Waiting for server confirmation...");
@@ -80,6 +91,7 @@ void buttonResetMode() {
 }
 
 void checkFingerprintMode(DisplayResultCallback displayResultCallback) {
+    
     lastCheck = millis();
     uint8_t p = finger.getImage();
     
@@ -121,8 +133,6 @@ void enrollFingerprint(DisplayResultCallback displayResultCallback) {
             String resultJson;
             serializeJson(resultDoc, resultJson);
             
-            extern void publishMessage(const char* topic, const char* message);
-            extern String topicAddFingerprintPublish;
             publishMessage(topicAddFingerprintPublish.c_str(), resultJson.c_str());
             Serial.println("Sent face ID mismatch error: " + resultJson);
             
@@ -168,9 +178,6 @@ void enrollFingerprint(DisplayResultCallback displayResultCallback) {
             
             String resultJson;
             serializeJson(resultDoc, resultJson);
-            
-            extern void publishMessage(const char* topic, const char* message);
-            extern String topicAddFingerprintPublish;
             publishMessage(topicAddFingerprintPublish.c_str(), resultJson.c_str());
             Serial.println("Sent enrollment result with template data");
         } else {
@@ -184,8 +191,6 @@ void enrollFingerprint(DisplayResultCallback displayResultCallback) {
             String resultJson;
             serializeJson(resultDoc, resultJson);
             
-            extern void publishMessage(const char* topic, const char* message);
-            extern String topicAddFingerprintPublish;
             publishMessage(topicAddFingerprintPublish.c_str(), resultJson.c_str());
             Serial.println("Sent enrollment result without template data");
         }
@@ -202,8 +207,6 @@ void enrollFingerprint(DisplayResultCallback displayResultCallback) {
         String resultJson;
         serializeJson(resultDoc, resultJson);
         
-        extern void publishMessage(const char* topic, const char* message);
-        extern String topicAddFingerprintPublish;
         publishMessage(topicAddFingerprintPublish.c_str(), resultJson.c_str());
         Serial.println("Sent enrollment failure: " + resultJson);
         
@@ -214,6 +217,7 @@ void enrollFingerprint(DisplayResultCallback displayResultCallback) {
 }
 
 void processDeleteFingerprint(uint8_t id, DisplayResultCallback displayResultCallback) {
+
     bool faceAuthenticated = faceAuthentication();
 
     if (!faceAuthenticated) {
@@ -241,8 +245,6 @@ void processDeleteFingerprint(uint8_t id, DisplayResultCallback displayResultCal
             String resultJson;
             serializeJson(resultDoc, resultJson);
             
-            extern void publishMessage(const char* topic, const char* message);
-            String topicDeleteFingerprintPublish = "deleteFingerprint-smartlock/" + String(userId) + "/" + String(deviceId);
             publishMessage(topicDeleteFingerprintPublish.c_str(), resultJson.c_str());
             Serial.println("Sent face ID mismatch error: " + resultJson);
             
@@ -252,7 +254,6 @@ void processDeleteFingerprint(uint8_t id, DisplayResultCallback displayResultCal
             pendingDeleteFingerprintId = -1;
             return;
         }
-        
         Serial.println("Face ID match confirmed, proceeding with fingerprint deletion");
     }
     
@@ -283,8 +284,6 @@ void processDeleteFingerprint(uint8_t id, DisplayResultCallback displayResultCal
         String resultJson;
         serializeJson(resultDoc, resultJson);
         
-        extern void publishMessage(const char* topic, const char* message);
-        String topicDeleteFingerprintPublish = "deleteFingerprint-smartlock/" + String(userId) + "/" + String(deviceId);
         publishMessage(topicDeleteFingerprintPublish.c_str(), resultJson.c_str());
         Serial.println("Sent deletion result: " + resultJson);
         
@@ -293,6 +292,85 @@ void processDeleteFingerprint(uint8_t id, DisplayResultCallback displayResultCal
         pendingDeleteFaceId = "";
         pendingDeleteFingerprintId = -1;
     }
+}
+
+void enrollRFID(DisplayResultCallback displayResultCallback) {
+    
+    bool faceAuthenticated = faceAuthentication();
+
+    if (!faceAuthenticated) {
+        displayResultCallback("Face auth required!", TFT_ORANGE);
+        Serial.println("Face authentication required before RFID enrollment");
+        return;
+    }
+
+    Serial.println("Face authenticated, checking if face IDs match");
+    Serial.println("Authenticated Face ID: " + faceId);
+    Serial.println("Requested Face ID: " + pendingRFIDFaceId);
+    
+    if (faceId != pendingRFIDFaceId) {
+        Serial.println("Face ID mismatch! Cannot enroll RFID for different face");
+        displayResultCallback("Face ID mismatch!", TFT_RED);
+        
+        StaticJsonDocument<200> resultDoc;
+        resultDoc["faceId"] = pendingRFIDFaceId;
+        resultDoc["authenticatedFaceId"] = faceId;
+        resultDoc["mode"] = "ADD RFID CARD FAILED: FACE ID MISMATCH";
+        
+        String resultJson;
+        serializeJson(resultDoc, resultJson);
+        
+        publishMessage(topicAddRFIDCardPublish.c_str(), resultJson.c_str());
+        Serial.println("Sent face ID mismatch error: " + resultJson);
+        
+        // Reset the pending state
+        pendingRFIDEnroll = false;
+        pendingRFIDFaceId = "";
+        return;
+    }
+    Serial.println("Face ID match confirmed, proceeding with RFID enrollment");
+    
+    isNormalMode = false;
+
+    uint8_t cardUID[7];
+    uint8_t uidLength;
+    
+    bool success = handleAddNewCard(displayResultCallback, cardUID, &uidLength);
+
+    Serial.println("RFID card enrollment result: " + String(success));
+    
+    if (success) {
+        Serial.println("RFID card enrollment successful");
+        
+        StaticJsonDocument<300> resultDoc;
+        resultDoc["faceId"] = pendingRFIDFaceId;
+        resultDoc["cardUID"] = rfidUIDToString(cardUID, uidLength);
+        resultDoc["uidLength"] = uidLength;
+        resultDoc["mode"] = "ADD RFID CARD SUCCESS";
+        
+        String resultJson;
+        serializeJson(resultDoc, resultJson);
+        publishMessage(topicAddRFIDCardPublish.c_str(), resultJson.c_str());
+        Serial.println("Sent RFID enrollment success: " + resultJson);
+        
+        displayResultCallback("Card added to account!", TFT_GREEN);
+    } else {
+        Serial.println("RFID card enrollment failed");
+        
+        StaticJsonDocument<200> resultDoc;
+        resultDoc["faceId"] = pendingRFIDFaceId;
+        resultDoc["mode"] = failedRFIDEnroll;
+
+        String resultJson;
+        serializeJson(resultDoc, resultJson);
+        
+        publishMessage(topicAddRFIDCardPublish.c_str(), resultJson.c_str());
+        Serial.println("Sent RFID enrollment failure: " + resultJson);
+    }
+    
+    pendingRFIDEnroll = false;
+    pendingRFIDFaceId = "";
+    isNormalMode = true;
 }
 
 void buttonEvent(
@@ -354,25 +432,37 @@ void buttonEvent(
             extern String pendingDeleteFaceId;
             extern int pendingDeleteFingerprintId;
             
+            // Check for pending RFID enrollment request
+            extern bool pendingRFIDEnroll;
+            extern String pendingRFIDFaceId;
+            
             if (pendingDeleteFingerprint) {
                 Serial.println("Processing pending fingerprint deletion request");
-                displayResultCallback("Authenticating face...", TFT_ORANGE);
+                displayResultCallback("Authenticating face - Delete Fingerprint", TFT_ORANGE);
+                delay(3000);
                 
-                // Gọi hàm xử lý xóa vân tay
                 processDeleteFingerprint(pendingDeleteFingerprintId, displayResultCallback);
                 
                 return;
             } else if (pendingFingerprintEnroll) {
                 Serial.println("Processing pending fingerprint enrollment request");
-                displayResultCallback("Authenticating face...", TFT_ORANGE);
+                displayResultCallback("Authenticating face - Add Fingerprint", TFT_ORANGE);
+                delay(3000);
                 
-                // This will trigger face authentication
-                // enrollFingerprint handles the face authentication internally
                 enrollFingerprint(displayResultCallback);
-                
-                // After face authentication and fingerprint enrollment, reset the pending state
+
                 pendingFingerprintEnroll = false;
                 pendingFaceId = "";
+                return;
+            } else if (pendingRFIDEnroll) {
+                Serial.println("Processing pending RFID enrollment request");
+                displayResultCallback("Authenticating face - Add RFID Card", TFT_ORANGE);
+                delay(3000);
+
+                enrollRFID(displayResultCallback);
+
+                pendingRFIDEnroll = false;
+                pendingRFIDFaceId = "";
                 return;
             }
 

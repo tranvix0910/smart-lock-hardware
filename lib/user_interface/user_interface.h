@@ -7,6 +7,10 @@
 #include <ArduinoJson.h>
 #include <ArduinoWebsockets.h>
 #include <Adafruit_Fingerprint.h>
+#include <SPI.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
+#include "freertos/queue.h"
 
 #include "api.h"
 #include "button.h"
@@ -29,6 +33,19 @@ extern WebsocketsClient WebSocketClient;
 #define BACKLIGHT_OFF 10      
 
 extern TFT_eSPI tft;
+
+// Khai báo biến toàn cục để dùng ở các file khác
+extern SemaphoreHandle_t wsMutex;
+extern QueueHandle_t buttonEventQueue;
+
+typedef void (*HandleImageCallback)();
+typedef void (*DisplayResultCallback)(String message, uint16_t color);
+
+// Thêm struct ButtonEvent vào header
+struct ButtonEvent {
+    HandleImageCallback handleImg;
+    DisplayResultCallback displayRes;
+};
 
 void websocketInit();
 void websocketHandle();
