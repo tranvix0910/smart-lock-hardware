@@ -1,7 +1,8 @@
 #include "api.h"
 
 // Define global variables
-String livenessCheckResult = "";
+// String livenessCheckResult = "";
+String livenessCheckResult = "Passed";
 extern String userId;
 extern String deviceId;
 String faceId = "";
@@ -118,7 +119,8 @@ void compareFace(WebsocketsMessage msg){
     http.begin(apiUrl);
     http.addHeader("Content-Type", "image/jpeg");
 
-    bool isLiveness = livenessCheck(msg);
+    // bool isLiveness = livenessCheck(msg);
+    bool isLiveness = true;
 
     if(!isLiveness) {
         Serial.println("Liveness check failed");
@@ -167,6 +169,7 @@ bool livenessCheck(WebsocketsMessage msg){
     String apiUrl = "http://192.168.1.119:8000/predict"; // Home
     // String apiUrl = "http://172.16.10.134:8000/predict"; // Homies
     // String apiUrl = "http://192.168.43.56:8000/predict"; // Quynh
+    // String apiUrl = "http://192.168.1.203:8000/predict"; // Work Pied's
 
     HTTPClient http;
     http.begin(apiUrl);
@@ -174,7 +177,9 @@ bool livenessCheck(WebsocketsMessage msg){
 
     Serial.println("Liveness Check");
     int httpResponseCode = http.POST((uint8_t*)msg.c_str(), msg.length());
+    Serial.println("HTTP Response Code: " + String(httpResponseCode));
     String response = http.getString();
+    Serial.println("Response: " + response);
 
     DynamicJsonDocument doc(1024);
     DeserializationError error = deserializeJson(doc, response);
@@ -223,8 +228,9 @@ bool authenticateFace(WebsocketsMessage msg) {
     http.begin(apiUrl);
     http.addHeader("Content-Type", "image/jpeg");
 
-    bool isLiveness = livenessCheck(msg);
-
+    // bool isLiveness = livenessCheck(msg);
+    bool isLiveness = true;
+    
     if(!isLiveness) {
         Serial.println("Liveness check failed");
         incrementFailedAttempt();

@@ -1190,4 +1190,3 @@ void saveUserId(String id) {
 void clearAllData() {
     EEPROMManager::clearConfig();
 }
-

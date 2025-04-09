@@ -13,16 +13,28 @@ bool pendingDeleteFingerprint = false;
 String pendingDeleteFaceId = "";
 int pendingDeleteFingerprintId = -1;
 
+// Variables for server-requested RFID enrollment
+String pendingRFIDFaceId = "";
+bool pendingRFIDEnroll = false;
+
 WiFiClientSecure net;
 PubSubClient AWSIoTClient(net);
 bool deviceVerified = false;
 
 String topicPublish;
 String topicSubscribe;
+
 String topicAddFingerprintPublish;
 String topicAddFingerprintSubscribe;
+
 String topicDeleteFingerprintPublish;
 String topicDeleteFingerprintSubscribe;
+
+String topicAddRFIDCardPublish;
+String topicAddRFIDCardSubscribe;
+
+String topicDeleteRFIDCardPublish;
+String topicDeleteRFIDCardSubscribe;
 
 bool subscribeTopic(const char* topic) {
     if (AWSIoTClient.subscribe(topic)) {
@@ -258,7 +270,6 @@ void handleMessage(char* topic, byte* payload, unsigned int length) {
                 String responseJson;
                 serializeJson(responseDoc, responseJson);
                 
-                String topicDeleteFingerprintPublish = "deleteFingerprint-smartlock/" + String(userId) + "/" + String(deviceId);
                 publishMessage(topicDeleteFingerprintPublish.c_str(), responseJson.c_str());
                 Serial.println("Sent waiting for authentication response: " + responseJson);
             } else {
@@ -270,24 +281,30 @@ void handleMessage(char* topic, byte* payload, unsigned int length) {
     }
 
     if(topicString.startsWith("addRFIDCard-server/")) {
-        if(doc.containsKey("mode") && doc.containsKey("faceId") && doc.containsKey("rfidCardId")) {
+        if(doc.containsKey("mode") && 
+            doc.containsKey("faceId") && 
+            doc.containsKey("deviceId") && 
+            doc.containsKey("userId")
+        ) {
             String modeReceived = doc["mode"].as<String>();
             String receivedFaceId = doc["faceId"].as<String>();
-            String rfidCardIdReceived = doc["rfidCardId"].as<String>();
+            String receivedDeviceId = doc["deviceId"].as<String>();
+            String receivedUserId = doc["userId"].as<String>();
             
-            if(modeReceived == "ADD RFID CARD REQUEST FROM SERVER") {
+            if(modeReceived == "ADD RFID CARD REQUEST FROM SERVER" && 
+                receivedUserId == userId && 
+                receivedDeviceId == deviceId) {
+                
                 Serial.println("Received RFID card addition request");
                 Serial.println("Face ID: " + receivedFaceId);
-                Serial.println("RFID Card ID: " + rfidCardIdReceived);
                 
                 // Set the pending flag and store the face ID
-                // pendingRFIDEnroll = true;
-                // pendingRFIDCardId = rfidCardIdReceived;
+                pendingRFIDEnroll = true;
+                pendingRFIDFaceId = receivedFaceId;
                 
                 // Send acknowledgment
                 StaticJsonDocument<200> responseDoc;
                 responseDoc["faceId"] = receivedFaceId;
-                responseDoc["rfidCardId"] = rfidCardIdReceived;
                 responseDoc["mode"] = "ADD RFID CARD REQUEST ACCEPTED";
                 
                 String responseJson;
@@ -313,7 +330,6 @@ void handleMessage(char* topic, byte* payload, unsigned int length) {
     }
 }
 
-// Hàm kiểm tra xem thiết bị đã được xác thực chưa
 bool isDeviceVerified() {
     return deviceVerified;
 }
@@ -342,13 +358,24 @@ bool connectToAWSIoTCore() {
 
     topicPublish = "smartlock/" + String(userId) + "/" + String(deviceId);
     topicSubscribe = "server/" + String(userId) + "/" + String(deviceId);
+
     topicAddFingerprintPublish = "addFingerprint-smartlock/" + String(userId) + "/" + String(deviceId);
     topicAddFingerprintSubscribe = "addFingerprint-server/" + String(userId) + "/" + String(deviceId);
-    String topicDeleteFingerprintSubscribe = "deleteFingerprint-server/" + String(userId) + "/" + String(deviceId);
+
+    topicDeleteFingerprintPublish = "deleteFingerprint-smartlock/" + String(userId) + "/" + String(deviceId);
+    topicDeleteFingerprintSubscribe = "deleteFingerprint-server/" + String(userId) + "/" + String(deviceId);
+
+    topicAddRFIDCardPublish = "addRFIDCard-smartlock/" + String(userId) + "/" + String(deviceId);
+    topicAddRFIDCardSubscribe = "addRFIDCard-server/" + String(userId) + "/" + String(deviceId);
+
+    topicDeleteRFIDCardPublish = "deleteRFIDCard-smartlock/" + String(userId) + "/" + String(deviceId);
+    topicDeleteRFIDCardSubscribe = "deleteRFIDCard-server/" + String(userId) + "/" + String(deviceId);
 
     subscribeTopic(topicSubscribe.c_str());
     subscribeTopic(topicAddFingerprintSubscribe.c_str());
     subscribeTopic(topicDeleteFingerprintSubscribe.c_str());
+    subscribeTopic(topicAddRFIDCardSubscribe.c_str());
+    subscribeTopic(topicDeleteRFIDCardSubscribe.c_str());
     
     Serial.println("AWS IoT Connected!");
     return true;

@@ -11,8 +11,18 @@
 // Topic strings
 extern String topicPublish;
 extern String topicSubscribe;
+
 extern String topicAddFingerprintPublish;
 extern String topicAddFingerprintSubscribe;
+
+extern String topicDeleteFingerprintPublish;
+extern String topicDeleteFingerprintSubscribe;
+
+extern String topicAddRFIDCardPublish;
+extern String topicAddRFIDCardSubscribe;
+
+extern String topicDeleteRFIDCardPublish;
+extern String topicDeleteRFIDCardSubscribe;
 
 // Fingerprint enrollment variables
 extern bool pendingFingerprintEnroll;

@@ -1,13 +1,20 @@
 #include "user_interface.h"
 #include "mqtt.h"
 #include "rfid.h"
+
+SemaphoreHandle_t wsMutex = NULL;
+QueueHandle_t buttonEventQueue = NULL;
+
 TFT_eSPI tft = TFT_eSPI();
+
 WebsocketsServer WebSocketServer;
 WebsocketsClient WebSocketClient;
 
 static unsigned long lastMotionTime = 0;
 
 void websocketInit() {
+    wsMutex = xSemaphoreCreateMutex();
+    buttonEventQueue = xQueueCreate(5, sizeof(ButtonEvent));
     WebSocketServer.listen(8888);
     Serial.println("WebSocket server started on port 8888");
 }
@@ -89,17 +96,20 @@ void handleImage() {
 }
 
 void websocketHandle() {
-    if(WebSocketServer.poll()) {
-        WebSocketClient = WebSocketServer.accept();
-        Serial.println("Client connected");
-    }
-
-    if(WebSocketClient.available()) {
-        WebSocketClient.poll();
-        buttonEvent(handleImage, displayResult);
-        if(isNormalMode) {
-            showingImage();
+    if(xSemaphoreTake(wsMutex, portMAX_DELAY) == pdTRUE) {
+        if(WebSocketServer.poll()) {
+            WebSocketClient = WebSocketServer.accept();
+            Serial.println("Client connected");
         }
+        if(WebSocketClient.available()) {
+            WebSocketClient.poll();
+            ButtonEvent evt = {handleImage, displayResult};
+            xQueueSend(buttonEventQueue, &evt, 0);
+            if(isNormalMode) {
+                showingImage();
+            }
+        }
+        xSemaphoreGive(wsMutex);
     }
 }
 
