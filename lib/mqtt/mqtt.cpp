@@ -24,6 +24,8 @@ bool deviceVerified = false;
 String topicPublish;
 String topicSubscribe;
 
+String topicDeleteSubscribe;
+
 String topicAddFingerprintPublish;
 String topicAddFingerprintSubscribe;
 
@@ -35,6 +37,9 @@ String topicAddRFIDCardSubscribe;
 
 String topicDeleteRFIDCardPublish;
 String topicDeleteRFIDCardSubscribe;
+
+String topicRecentAccessPublish;
+String topicRecentAccessSubscribe;
 
 bool subscribeTopic(const char* topic) {
     if (AWSIoTClient.subscribe(topic)) {
@@ -221,8 +226,6 @@ void handleMessage(char* topic, byte* payload, unsigned int length) {
                 responseDoc["faceId"] = faceIdReceived;
                 responseDoc["mode"] = "ADD FINGERPRINT REQUEST ACCEPTED";
                 
-                displayResult("Fingerprint enrollment requested\nPress button to authenticate face", TFT_BLUE);
-                
                 String responseJson;
                 serializeJson(responseDoc, responseJson);
                 
@@ -253,7 +256,6 @@ void handleMessage(char* topic, byte* payload, unsigned int length) {
                 
                 // Yêu cầu xác thực khuôn mặt
                 Serial.println("Face authentication required before fingerprint deletion");
-                displayResult("Press button to proceed", TFT_BLUE);
                 delay(3000);
                 
                 // Lưu thông tin yêu cầu để xử lý sau khi xác thực khuôn mặt
@@ -327,6 +329,8 @@ void handleMessage(char* topic, byte* payload, unsigned int length) {
         const char* lockState = doc["lockState"];
         
         processChangeState(receivedDeviceId, receivedUserId, lockState);
+
+        publishRecentAccessLogs("WEB_APP", "SUCCESS", "ACCOUNT USER", "Accessed Via Web App");
     }
 }
 
@@ -359,6 +363,8 @@ bool connectToAWSIoTCore() {
     topicPublish = "smartlock/" + String(userId) + "/" + String(deviceId);
     topicSubscribe = "server/" + String(userId) + "/" + String(deviceId);
 
+    topicDeleteSubscribe = "server-delete/" + userId + "/" + deviceId;
+
     topicAddFingerprintPublish = "addFingerprint-smartlock/" + String(userId) + "/" + String(deviceId);
     topicAddFingerprintSubscribe = "addFingerprint-server/" + String(userId) + "/" + String(deviceId);
 
@@ -371,12 +377,16 @@ bool connectToAWSIoTCore() {
     topicDeleteRFIDCardPublish = "deleteRFIDCard-smartlock/" + String(userId) + "/" + String(deviceId);
     topicDeleteRFIDCardSubscribe = "deleteRFIDCard-server/" + String(userId) + "/" + String(deviceId);
 
+    topicRecentAccessPublish = "recentAccess-smartlock/" + String(userId) + "/" + String(deviceId);
+    topicRecentAccessSubscribe = "recentAccess-server/" + String(userId) + "/" + String(deviceId);
+
     subscribeTopic(topicSubscribe.c_str());
     subscribeTopic(topicAddFingerprintSubscribe.c_str());
     subscribeTopic(topicDeleteFingerprintSubscribe.c_str());
     subscribeTopic(topicAddRFIDCardSubscribe.c_str());
     subscribeTopic(topicDeleteRFIDCardSubscribe.c_str());
-    
+    subscribeTopic(topicRecentAccessSubscribe.c_str());
+    subscribeTopic(topicDeleteSubscribe.c_str());
     Serial.println("AWS IoT Connected!");
     return true;
 }
@@ -388,24 +398,14 @@ void reconnect() {
             Serial.println("connected");
             subscribeTopic(topicSubscribe.c_str());
             subscribeTopic(topicAddFingerprintSubscribe.c_str());
-            
-            String topicDeleteFingerprintSubscribe = "deleteFingerprint-server/" + String(userId) + "/" + String(deviceId);
+            subscribeTopic(topicDeleteSubscribe.c_str());
             subscribeTopic(topicDeleteFingerprintSubscribe.c_str());
-            
-            Serial.println("Subscribed to topics");
-        } else {
-            Serial.print("failed, rc=");
-            Serial.print(AWSIoTClient.state());
-            Serial.println(" try again in 2 seconds");
-            delay(2000);
-        }
-    }
-}
+            subscribeTopic(topicAddRFIDCardSubscribe.c_str());
+            subscribeTopic(topicDeleteRFIDCardSubscribe.c_str());
+            subscribeTopic(topicRecentAccessSubscribe.c_str());
 
-void publishMessage(const char* topic, const char* message) {
-    Serial.print("Publishing message to topic: ");
-    Serial.println(topic);
-    Serial.println(message);
+            
+al.println(message);
     AWSIoTClient.publish(topic, message);
 }
 

@@ -3,6 +3,9 @@
 HardwareSerial mySerial(2);
 Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
 
+unsigned long lastCheckFingerprint = 0;
+uint8_t fingerprintMode = FINGERPRINT_SCAN_MODE;
+
 void fingerprintInit() {
     mySerial.begin(BAUD_RATE, SERIAL_8N1, RX_PIN, TX_PIN);
     Serial.println("Connecting to fingerprint sensor...");
@@ -266,6 +269,7 @@ bool unlockWithFingerprint(DisplayResultCallback displayResultCallback) {
     if (p != FINGERPRINT_OK) {
         displayResultCallback("Image error", TFT_RED);
         incrementFailedAttempt();
+        publishRecentAccessLogs("FINGERPRINT", "FAILED", "Unknown", "Image error");
         return false;
     }
     
@@ -284,6 +288,7 @@ bool unlockWithFingerprint(DisplayResultCallback displayResultCallback) {
         
         lockOpen();
         resetFailedAttempts();
+        publishRecentAccessLogs("FINGERPRINT", "SUCCESS", String(finger.fingerID), "Access Granted");
         return true;
     } else {
         displayResultCallback("Access Denied!", TFT_RED);
@@ -291,6 +296,7 @@ bool unlockWithFingerprint(DisplayResultCallback displayResultCallback) {
         delay(1000);
         isNormalMode = true;
         incrementFailedAttempt();
+        publishRecentAccessLogs("FINGERPRINT", "FAILED", "Unknown", "Access Denied");
         return false;
     }
 }
@@ -372,4 +378,25 @@ String getLatestFingerprintTemplateAsBase64(uint8_t fingerprintID) {
     return base64Template;
 }
 
-
+void checkFingerprintMode(DisplayResultCallback displayResultCallback) {
+    unsigned long currentTime = millis();
+    
+    if (currentTime - lastCheckFingerprint < 5000) {
+        return;
+    }
+    
+    uint8_t p = finger.getImage();
+    
+    if (p == FINGERPRINT_OK) {
+        if (isNormalMode) {
+            isNormalMode = false;
+            fingerprintMode = FINGERPRINT_SCAN_MODE;
+        }
+        if (!isNormalMode && fingerprintMode == FINGERPRINT_SCAN_MODE) {
+            bool unlockSuccess = unlockWithFingerprint(displayResultCallback);
+            if (unlockSuccess) {
+                lastCheckFingerprint = currentTime;
+            }
+        }
+    }
+}

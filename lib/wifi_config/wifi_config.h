@@ -27,7 +27,7 @@ void wifiConfigRun();
 bool checkWiFiStatus();
 void wifiAPSetup();
 void generateDeviceInfo();
-void getDeviceInfoValues(const char* &deviceId, const char* &macAddress, const char* &userId);
+void getDeviceInfoValues(const char* &deviceIdPtr, const char* &userIdPtr);
 void saveUserId(String id);
 void clearAllData();
 

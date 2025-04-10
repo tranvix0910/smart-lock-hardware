@@ -9,7 +9,7 @@
 #include "mqtt.h"
 #include "alert.h"
 
-TaskHandle_t rfidTask = NULL;
+TaskHandle_t rfidTask = NULL;                                       
 TaskHandle_t webSocketTask = NULL;
 TaskHandle_t buttonTask = NULL;
 TaskHandle_t rfidModeTask = NULL;
@@ -36,7 +36,7 @@ void buttonTaskFunction(void *parameter) {
     for(;;) {
         if(xQueueReceive(buttonEventQueue, &evt, portMAX_DELAY) == pdTRUE) {
             if(xSemaphoreTake(wsMutex, portMAX_DELAY) == pdTRUE) {
-                buttonEvent(evt.handleImg, evt.displayRes);
+                buttonEvent(evt.handleImg, evt.displayRes, evt.displayCornerText);
                 xSemaphoreGive(wsMutex);
             }
         }
@@ -83,7 +83,7 @@ void smartLockSystemInit() {
     
     Serial.println("Initializing security sensors...");
     fingerprintInit();     
-    // rfidInit();             // RFID
+    // rfidInit();
     motionDetectBegin();    
     magneticHallInit();     
     
@@ -161,4 +161,5 @@ void smartLockSystemUpdate() {
     lockUpdate();
     buttonResetMode();
     clientLoop();
+
 }

@@ -840,9 +840,8 @@ const char html[] PROGMEM = R"html(
 </html>
 )html";
 
-void getDeviceInfoValues(const char* &deviceIdPtr, const char* &macAddressPtr, const char* &userIdPtr) {
+void getDeviceInfoValues(const char* &deviceIdPtr, const char* &userIdPtr) {
     deviceIdPtr = deviceId.c_str();
-    macAddressPtr = macAddress.c_str();
     userIdPtr = userId.c_str();
 }
 

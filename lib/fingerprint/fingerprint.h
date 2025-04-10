@@ -7,10 +7,14 @@
 #include "lock.h"
 #include "user_interface.h"
 #include <base64.h>
+#include "recentAccessLogs.h"
 
 #define RX_PIN 16 // GREEN
 #define TX_PIN 17 // WHITE
 #define BAUD_RATE 57600
+
+#define FINGERPRINT_SCAN_MODE 0
+#define FINGERPRINT_ENROLL_MODE 1
 
 extern HardwareSerial mySerial;
 extern Adafruit_Fingerprint finger;
@@ -26,5 +30,6 @@ bool deleteFingerprint(uint8_t id, DisplayResultCallback displayResultCallback);
 bool isFingerIDFree(uint8_t id);
 int getNextFreeID();
 String getLatestFingerprintTemplateAsBase64(uint8_t fingerprintID);
+void checkFingerprintMode(DisplayResultCallback displayResultCallback);
 
 #endif

@@ -7,6 +7,7 @@
 #include <EEPROM.h>
 #include "secrets.h"
 #include "lock.h"
+#include "recentAccessLogs.h"
 
 // Topic strings
 extern String topicPublish;
@@ -24,6 +25,9 @@ extern String topicAddRFIDCardSubscribe;
 extern String topicDeleteRFIDCardPublish;
 extern String topicDeleteRFIDCardSubscribe;
 
+extern String topicRecentAccessPublish;
+extern String topicRecentAccessSubscribe;
+
 // Fingerprint enrollment variables
 extern bool pendingFingerprintEnroll;
 extern String pendingFaceId;
@@ -35,8 +39,6 @@ extern int pendingDeleteFingerprintId;
 
 // External functions
 extern void displayResult(String message, uint16_t color);
-extern bool deleteFingerprintProcess(uint8_t id, void (*displayCallback)(String, uint16_t));
-
 bool connectToAWSIoTCore();
 bool subscribeTopic(const char* topic);
 void handleMessage(char* topic, byte* payload, unsigned int length);

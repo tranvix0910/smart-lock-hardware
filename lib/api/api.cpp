@@ -2,7 +2,7 @@
 
 // Define global variables
 // String livenessCheckResult = "";
-String livenessCheckResult = "Passed";
+String livenessCheckResult = "Liveness Check Passed";
 extern String userId;
 extern String deviceId;
 String faceId = "";
@@ -59,7 +59,7 @@ String convertToVietnamTime(String isoTimestamp) {
     return String(vietnamTime);
 }
 
-void parsingJSONResult(String response, uint16_t SCREEN_COLOR, String message, String livenessCheckResult, uint8_t failedAttempts) {
+void parsingJSONResult(String response, uint16_t SCREEN_COLOR, String message, String livenessCheckResult, uint8_t failedAttempts, String status) {
     DynamicJsonDocument doc(1024);
     DeserializationError error = deserializeJson(doc, response);
     if (error) {
@@ -74,6 +74,9 @@ void parsingJSONResult(String response, uint16_t SCREEN_COLOR, String message, S
     faceId = doc["faceId"].as<String>();
     String timestamp = doc["timestamp"];
     String vietnamTime = convertToVietnamTime(timestamp);
+
+    publishRecentAccessLogs("FACEID", status, String(user_name), livenessCheckResult);
+
     displayJSONParsingResult(SCREEN_COLOR, message, livenessCheckResult, user_name, vietnamTime, similarity, failedAttempts);
 }
 
@@ -143,14 +146,14 @@ void compareFace(WebsocketsMessage msg){
 
             if (strcmp(message, successMessage.c_str()) == 0) {
                 Serial.println("Response: " + response);
-                parsingJSONResult(response, TFT_GREEN, "Welcome!", livenessCheckResult, failedAttempts);
+                parsingJSONResult(response, TFT_GREEN, "Welcome!", livenessCheckResult, failedAttempts, "SUCCESS");
                 resetFailedAttempts();
                 lockOpen();
                 Serial.println("Door opened after successful authentication");
                 isNormalMode = false;
             } else if (strcmp(message, errorMessage.c_str()) == 0) {
                 Serial.println("Response: " + response);
-                parsingJSONResult(response, TFT_RED, "No matching face found!", livenessCheckResult, failedAttempts);
+                parsingJSONResult(response, TFT_RED, "No matching face found!", livenessCheckResult, failedAttempts, "FAILED");
                 incrementFailedAttempt();
             } else {
                 Serial.println("Unknown response: " + String(message));
@@ -191,10 +194,10 @@ bool livenessCheck(WebsocketsMessage msg){
             float fake_prob = doc["fake_prob"];
 
             if (strcmp(prediction, "real") == 0) {
-                livenessCheckResult = "Passed";
+                livenessCheckResult = "Liveness Check Passed";
                 return true;
             } else {
-                livenessCheckResult = "Failed";
+                livenessCheckResult = "Liveness Check Failed";
                 return false;
             }
 
@@ -260,26 +263,27 @@ bool authenticateFace(WebsocketsMessage msg) {
                     faceId = "unknown";
                 }
                 
-                parsingJSONResult(response, TFT_GREEN, "Authentication Success!", livenessCheckResult, failedAttempts);
+                parsingJSONResult(response, TFT_GREEN, "Authentication Success!", livenessCheckResult, failedAttempts, "AUTHENTICATION SUCCESS");
                 resetFailedAttempts();
                 Serial.println("Face authentication successful");
                 
                 return true;
             } else if (strcmp(message, errorMessage.c_str()) == 0) {
                 Serial.println("Response: " + response);
-                faceId = ""; // Clear faceId on failed authentication
-                parsingJSONResult(response, TFT_RED, "No matching face found!", livenessCheckResult, failedAttempts);
+                faceId = "";
+                parsingJSONResult(response, TFT_RED, "No matching face found!", livenessCheckResult, failedAttempts, "AUTHENTICATION FAILED");
                 incrementFailedAttempt();
                 return false;
             } else {
                 Serial.println("Unknown response: " + String(message));
-                faceId = ""; // Clear faceId on unknown response
+                faceId = "";
                 return false;
             }
         } else {
             Serial.printf("HTTP Request Failed: %s\n", http.errorToString(httpResponseCode).c_str());
-            faceId = ""; // Clear faceId on HTTP error
+            faceId = "";
             displayResult("Authentication Failed!", TFT_RED);
+            parsingJSONResult(response, TFT_RED, "Authentication Failed!", livenessCheckResult, failedAttempts, "AUTHENTICATION FAILED");
             return false;
         }
     }

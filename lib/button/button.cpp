@@ -9,13 +9,12 @@ extern String faceId;
 extern String topicAddFingerprintPublish;
 extern String topicDeleteFingerprintPublish;
 
-extern void publishMessage(const char* topic, const char* message);
-
 bool isNormalMode = true;
 bool lastButtonStateCapture = HIGH;
 bool lastButtonStateReset = HIGH;
 unsigned long lastCheck = 0;
 bool isFirstRun = true;
+unsigned long buttonPressStartTime = 0;
 
 // Variables for server-requested fingerprint enrollment are declared in mqtt.cpp
 extern bool pendingFingerprintEnroll;
@@ -24,11 +23,12 @@ extern String pendingFaceId;
 // Variables for server-requested RFID enrollment are declared in mqtt.cpp
 extern bool pendingRFIDEnroll;
 extern String pendingRFIDFaceId;
-
 extern String failedRFIDEnroll;
 
-unsigned long buttonPressStartTime = 0;
-uint8_t fingerprintMode = FINGERPRINT_SCAN_MODE;
+// Check for pending fingerprint deletion request
+extern bool pendingDeleteFingerprint;
+extern String pendingDeleteFaceId;
+extern int pendingDeleteFingerprintId;
 
 #define RESET_PRESS_TIME 5000
 
@@ -55,13 +55,6 @@ void buttonResetMode() {
         isResetMode = true;
         lastButtonStateReset = LOW;
         Serial.println("Reset mode: Button pressed, waiting for 5 seconds...");
-        
-        String topicDeleteSubscribe = "server-delete/" + userId + "/" + deviceId;
-        if(subscribeTopic(topicDeleteSubscribe.c_str())) {
-            Serial.println("Subscribed to topic: " + topicDeleteSubscribe);
-        } else {
-            Serial.println("Failed to subscribe to topic: " + topicDeleteSubscribe);
-        }
     } 
     else if (statusButtonPinReset == HIGH && lastButtonStateReset == LOW) {
         isResetMode = false;
@@ -86,22 +79,6 @@ void buttonResetMode() {
             Serial.println("Delete request sent: " + jsonString);
             Serial.println("Waiting for server confirmation...");
             delay(2000);
-        }
-    }
-}
-
-void checkFingerprintMode(DisplayResultCallback displayResultCallback) {
-    
-    lastCheck = millis();
-    uint8_t p = finger.getImage();
-    
-    if (p == FINGERPRINT_OK) {
-        if (isNormalMode) {
-            isNormalMode = false;
-            fingerprintMode = FINGERPRINT_SCAN_MODE;
-        }
-        if (!isNormalMode && fingerprintMode == FINGERPRINT_SCAN_MODE) {
-            bool unlockSuccess = unlockWithFingerprint(displayResultCallback);
         }
     }
 }
@@ -375,7 +352,8 @@ void enrollRFID(DisplayResultCallback displayResultCallback) {
 
 void buttonEvent(
     HandleImageCallback handleImageCallback, 
-    DisplayResultCallback displayResultCallback
+    DisplayResultCallback displayResultCallback,
+    DisplayCornerTextCallback displayCornerText
 ) {
     static unsigned long lastMillis = 0;
     static unsigned long pressStartTime = 0;
@@ -395,6 +373,18 @@ void buttonEvent(
                       String(lastButtonStateCapture == HIGH ? "HIGH (not pressed)" : "LOW (pressed)"));
         lastMillis = newMillis;
         return;
+    }
+
+    if(pendingDeleteFingerprint){
+        displayCornerText("Deleting Fingerprint", TFT_RED, 1);
+    }
+
+    if(pendingFingerprintEnroll){
+        displayCornerText("Enrolling Fingerprint", TFT_GREEN, 1);
+    }
+
+    if(pendingRFIDEnroll){
+        displayCornerText("Enrolling RFID", TFT_BLUE, 1);
     }
 
     if (newMillis - lastMillis > 50) { 
@@ -423,22 +413,9 @@ void buttonEvent(
                 return;
             }
 
-            // Check for pending fingerprint enrollment request
-            extern bool pendingFingerprintEnroll;
-            extern String pendingFaceId;
-            
-            // Check for pending fingerprint deletion request
-            extern bool pendingDeleteFingerprint;
-            extern String pendingDeleteFaceId;
-            extern int pendingDeleteFingerprintId;
-            
-            // Check for pending RFID enrollment request
-            extern bool pendingRFIDEnroll;
-            extern String pendingRFIDFaceId;
-            
             if (pendingDeleteFingerprint) {
                 Serial.println("Processing pending fingerprint deletion request");
-                displayResultCallback("Authenticating face - Delete Fingerprint", TFT_ORANGE);
+                displayResultCallback("Authenticating face", TFT_ORANGE);
                 delay(3000);
                 
                 processDeleteFingerprint(pendingDeleteFingerprintId, displayResultCallback);
@@ -446,7 +423,7 @@ void buttonEvent(
                 return;
             } else if (pendingFingerprintEnroll) {
                 Serial.println("Processing pending fingerprint enrollment request");
-                displayResultCallback("Authenticating face - Add Fingerprint", TFT_ORANGE);
+                displayResultCallback("Authenticating face", TFT_ORANGE);
                 delay(3000);
                 
                 enrollFingerprint(displayResultCallback);
@@ -456,7 +433,7 @@ void buttonEvent(
                 return;
             } else if (pendingRFIDEnroll) {
                 Serial.println("Processing pending RFID enrollment request");
-                displayResultCallback("Authenticating face - Add RFID Card", TFT_ORANGE);
+                displayResultCallback("Authenticating face", TFT_ORANGE);
                 delay(3000);
 
                 enrollRFID(displayResultCallback);

@@ -84,6 +84,7 @@ void showingImage() {
 bool faceAuthentication() {
     Serial.println("Face Authentication Start");
     WebsocketsMessage msg = WebSocketClient.readBlocking();
+    tft.setRotation(0);
     TJpgDec.drawJpg(0, 0, (const uint8_t*)msg.c_str(), msg.length());
     return authenticateFace(msg);
 }
@@ -95,6 +96,14 @@ void handleImage() {
     compareFace(msg);
 }
 
+void displayCornerText(String message, uint16_t color, uint8_t fontSize) {
+    tft.setRotation(0);
+    tft.setTextSize(fontSize);
+    tft.setTextColor(color);
+    tft.setTextDatum(TL_DATUM);
+    tft.drawString(message, 5, 5, GFXFF);
+}
+
 void websocketHandle() {
     if(xSemaphoreTake(wsMutex, portMAX_DELAY) == pdTRUE) {
         if(WebSocketServer.poll()) {
@@ -103,7 +112,7 @@ void websocketHandle() {
         }
         if(WebSocketClient.available()) {
             WebSocketClient.poll();
-            ButtonEvent evt = {handleImage, displayResult};
+            ButtonEvent evt = {handleImage, displayResult, displayCornerText};
             xQueueSend(buttonEventQueue, &evt, 0);
             if(isNormalMode) {
                 showingImage();
@@ -137,4 +146,5 @@ void displayJSONParsingResult(uint16_t color, String message, String livenessChe
     tft.drawString("Similarity: " + String(similarity) + "%", centerX, startY + 120, GFXFF);
     tft.drawString("Failed Attempts: " + String(failedAttempts), centerX, startY + 150, GFXFF);
 }
+
 

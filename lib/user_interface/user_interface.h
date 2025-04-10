@@ -8,6 +8,7 @@
 #include <ArduinoWebsockets.h>
 #include <Adafruit_Fingerprint.h>
 #include <SPI.h>
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/queue.h"
@@ -18,6 +19,7 @@
 #include "fingerprint.h"
 #include "lock.h"
 #include "magnetic_hall.h"
+#include "recentAccessLogs.h"
 
 using namespace websockets;
 
@@ -34,17 +36,17 @@ extern WebsocketsClient WebSocketClient;
 
 extern TFT_eSPI tft;
 
-// Khai báo biến toàn cục để dùng ở các file khác
 extern SemaphoreHandle_t wsMutex;
 extern QueueHandle_t buttonEventQueue;
 
 typedef void (*HandleImageCallback)();
 typedef void (*DisplayResultCallback)(String message, uint16_t color);
+typedef void (*DisplayCornerTextCallback)(String message, uint16_t color, uint8_t fontSize);
 
-// Thêm struct ButtonEvent vào header
 struct ButtonEvent {
     HandleImageCallback handleImg;
     DisplayResultCallback displayRes;
+    DisplayCornerTextCallback displayCornerText;
 };
 
 void websocketInit();
