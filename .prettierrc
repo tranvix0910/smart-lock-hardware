@@ -1,0 +1,18 @@
+{
+  "tabWidth": 2,
+  "useTabs": false,
+  "semi": true,
+  "singleQuote": false,
+  "bracketSpacing": true,
+  "arrowParens": "avoid",
+  "endOfLine": "lf",
+  "printWidth": 80,
+  "overrides": [
+    {
+      "files": ["*.cpp", "*.h", "*.hpp", "*.cc", "*.c"],
+      "options": {
+        "parser": "cpp"
+      }
+    }
+  ]
+}

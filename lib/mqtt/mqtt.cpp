@@ -404,9 +404,14 @@ void reconnect() {
             subscribeTopic(topicDeleteRFIDCardSubscribe.c_str());
             subscribeTopic(topicRecentAccessSubscribe.c_str());
 
-            
-al.println(message);
-    AWSIoTClient.publish(topic, message);
+            Serial.println("AWS IoT Connected!");
+        } else {
+            Serial.print("failed, rc=");
+            Serial.print(AWSIoTClient.state());
+            Serial.println(" try again in 5 seconds");
+            delay(5000);
+        }
+    }
 }
 
 void clientLoop() {
