@@ -1,6 +1,6 @@
 #include "lock.h"
 #include "mqtt.h"
-
+#include "freertos/FreeRTOS.h"
 unsigned long lockOpenTime = 0;
 unsigned long lastDoorCheckTime = 0;
 unsigned long lockOpenWithoutDoorOpenTime = 0;
@@ -27,9 +27,9 @@ bool isSystemLockedOut() {
         isNormalMode = false;
         for (int i = 0; i < 3; i++) {
             alertTurnOn(); 
-            delay(200);
+            vTaskDelay(200 / portTICK_PERIOD_MS);
             alertTurnOff();
-            delay(200);
+            vTaskDelay(200 / portTICK_PERIOD_MS);
         }
         return true;
     }
@@ -58,7 +58,7 @@ void incrementFailedAttempt() {
         isDoorAlertActive = false;
     } else {
         alertTurnOn();
-        delay(500);
+        vTaskDelay(500 / portTICK_PERIOD_MS);
         alertTurnOff();
     }
 }

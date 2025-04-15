@@ -925,7 +925,7 @@ void setupWifi() {
         
         unsigned long startTime = millis();
         while (WiFi.status() != WL_CONNECTED && millis() - startTime < 10000) {
-            delay(500);
+            vTaskDelay(500 / portTICK_PERIOD_MS);
             Serial.print(".");
         }
         Serial.println();
@@ -938,7 +938,7 @@ void setupWifi() {
         } else {
             Serial.println("Cannot connect to WiFi. Switching to AP mode.");
             WiFi.disconnect();
-            delay(1000);
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
             createAccessPoint();
         }
     } else {
@@ -960,7 +960,7 @@ void setupWebServer() {
         unsigned long timeout = millis();
         
         while (networks < 0 && millis() - timeout < 10000) {
-            delay(100);
+            vTaskDelay(100 / portTICK_PERIOD_MS);
             networks = WiFi.scanComplete();
         }
         
@@ -1005,7 +1005,7 @@ void setupWebServer() {
             WiFi.begin(ssid.c_str(), password.c_str());
             unsigned long startTime = millis();
             while (WiFi.status() != WL_CONNECTED && millis() - startTime < 10000) {
-                delay(500);
+                vTaskDelay(500 / portTICK_PERIOD_MS);
                 Serial.print(".");
             }
             Serial.println();
@@ -1060,7 +1060,7 @@ void setupWebServer() {
         Serial.println("Received request to restart device");
         webServer.sendHeader("Connection", "close");
         webServer.send(200, "text/plain", "Device is restarting...");
-        delay(1000);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
         ESP.restart();
     });
     

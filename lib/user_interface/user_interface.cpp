@@ -1,7 +1,7 @@
 #include "user_interface.h"
 #include "mqtt.h"
 #include "rfid.h"
-
+#include "freertos/FreeRTOS.h"
 SemaphoreHandle_t wsMutex = NULL;
 QueueHandle_t buttonEventQueue = NULL;
 
@@ -70,7 +70,7 @@ void displayInit() {
     tft.setTextDatum(TC_DATUM);
     tft.drawString("Smart Door System", 120, 80, GFXFF);
     tft.drawString("Initializing...", 120, 120, GFXFF);
-    delay(2000);
+    vTaskDelay(2000 / portTICK_PERIOD_MS);  
     tft.setRotation(1);
     tft.fillScreen(TFT_BLACK);
 }
@@ -84,7 +84,7 @@ void showingImage() {
 bool faceAuthentication() {
     Serial.println("Face Authentication Start");
     WebsocketsMessage msg = WebSocketClient.readBlocking();
-    tft.setRotation(0);
+    tft.setRotation(1);
     TJpgDec.drawJpg(0, 0, (const uint8_t*)msg.c_str(), msg.length());
     return authenticateFace(msg);
 }

@@ -1,6 +1,6 @@
 #include "button.h"
 #include "rfid.h"
-
+#include "freertos/FreeRTOS.h"
 extern String deviceId;
 extern String macAddress;
 extern String userId;
@@ -78,7 +78,7 @@ void buttonResetMode() {
             publishMessage(topicDelete.c_str(), jsonString.c_str());
             Serial.println("Delete request sent: " + jsonString);
             Serial.println("Waiting for server confirmation...");
-            delay(2000);
+            vTaskDelay(2000 / portTICK_PERIOD_MS);
         }
     }
 }
@@ -416,7 +416,7 @@ void buttonEvent(
             if (pendingDeleteFingerprint) {
                 Serial.println("Processing pending fingerprint deletion request");
                 displayResultCallback("Authenticating face", TFT_ORANGE);
-                delay(3000);
+                vTaskDelay(3000 / portTICK_PERIOD_MS);
                 
                 processDeleteFingerprint(pendingDeleteFingerprintId, displayResultCallback);
                 
@@ -424,7 +424,7 @@ void buttonEvent(
             } else if (pendingFingerprintEnroll) {
                 Serial.println("Processing pending fingerprint enrollment request");
                 displayResultCallback("Authenticating face", TFT_ORANGE);
-                delay(3000);
+                vTaskDelay(3000 / portTICK_PERIOD_MS);
                 
                 enrollFingerprint(displayResultCallback);
 
@@ -434,7 +434,7 @@ void buttonEvent(
             } else if (pendingRFIDEnroll) {
                 Serial.println("Processing pending RFID enrollment request");
                 displayResultCallback("Authenticating face", TFT_ORANGE);
-                delay(3000);
+                vTaskDelay(3000 / portTICK_PERIOD_MS);
 
                 enrollRFID(displayResultCallback);
 
