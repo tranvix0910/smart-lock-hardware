@@ -1,5 +1,5 @@
 #include "mqtt.h"
-
+#include "freertos/FreeRTOS.h"
 extern String deviceId;
 extern String macAddress;
 extern String userId;
@@ -49,6 +49,18 @@ bool subscribeTopic(const char* topic) {
     }
     return false;
 }
+
+void publishMessage(const char* topic, const char* message) {
+    if (AWSIoTClient.publish(topic, message)) {
+        Serial.print("Message published to topic: ");
+        Serial.println(topic);
+    } else {
+        Serial.print("Failed to publish message to topic: ");
+        Serial.println(topic);
+    }
+}
+
+
 
 void messageLock(String lockState) {
     StaticJsonDocument<512> doc;
@@ -188,7 +200,7 @@ void handleMessage(char* topic, byte* payload, unsigned int length) {
             publishMessage(topicDelete.c_str(), confirmJson.c_str());
             Serial.println("Deletion confirmation sent: " + confirmJson);
 
-            delay(100);
+            vTaskDelay(100 / portTICK_PERIOD_MS);
             ESP.restart();
         } else {
             Serial.println("No confirmation received from server");
@@ -256,7 +268,7 @@ void handleMessage(char* topic, byte* payload, unsigned int length) {
                 
                 // Yêu cầu xác thực khuôn mặt
                 Serial.println("Face authentication required before fingerprint deletion");
-                delay(3000);
+                vTaskDelay(3000 / portTICK_PERIOD_MS);
                 
                 // Lưu thông tin yêu cầu để xử lý sau khi xác thực khuôn mặt
                 pendingDeleteFingerprint = true;
@@ -351,7 +363,7 @@ bool connectToAWSIoTCore() {
     while (!AWSIoTClient.connect(THINGNAME))
     {
         Serial.print(".");
-        delay(100);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
     }
     
     if (!AWSIoTClient.connected())
@@ -409,7 +421,7 @@ void reconnect() {
             Serial.print("failed, rc=");
             Serial.print(AWSIoTClient.state());
             Serial.println(" try again in 5 seconds");
-            delay(5000);
+            vTaskDelay(5000 / portTICK_PERIOD_MS);
         }
     }
 }

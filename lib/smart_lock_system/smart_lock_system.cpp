@@ -8,26 +8,25 @@
 #include "button.h"
 #include "mqtt.h"
 #include "alert.h"
+#include "esp_task_wdt.h"
 
-TaskHandle_t rfidTask = NULL;                                       
+// TaskHandle_t rfidTask = NULL;                                       
 TaskHandle_t webSocketTask = NULL;
 TaskHandle_t buttonTask = NULL;
 TaskHandle_t rfidModeTask = NULL;
 TaskHandle_t fingerprintModeTask = NULL;
 
-// Hàm xử lý task RFID
 // void rfidTaskFunction(void *parameter) {
 //     for(;;) {
 //         rfidRead();
-//         // Delay 100ms
-//         vTaskDelay(100 / portTICK_PERIOD_MS);
+//         vTaskDelay(200 / portTICK_PERIOD_MS);
 //     }
 // }
 
 void webSocketTaskFunction(void *parameter) {
     for(;;) {
         websocketHandle();
-        vTaskDelay(50 / portTICK_PERIOD_MS);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }
 
@@ -44,14 +43,12 @@ void buttonTaskFunction(void *parameter) {
     }
 }
 
-// Hàm xử lý task RFID Mode
-// void rfidModeTaskFunction(void *parameter) {
-//     for(;;) {
-//         checkRFIDMode(displayResult);
-//         // Delay 100ms
-//         vTaskDelay(100 / portTICK_PERIOD_MS);
-//     }
-// }
+void rfidModeTaskFunction(void *parameter) {
+    for(;;) {
+        checkRFIDMode(displayResult);
+        vTaskDelay(10 / portTICK_PERIOD_MS);
+    }
+}
 
 void fingerprintModeTaskFunction(void *parameter) {
     for(;;) {
@@ -83,7 +80,7 @@ void smartLockSystemInit() {
     
     Serial.println("Initializing security sensors...");
     fingerprintInit();     
-    // rfidInit();
+    rfidInit();
     motionDetectBegin();    
     magneticHallInit();     
     
@@ -94,44 +91,43 @@ void smartLockSystemInit() {
     
     Serial.println("Creating RTOS tasks...");
     
-    // Tạo task cho RFID đọc thẻ (ưu tiên thấp)
     // xTaskCreate(
     //     rfidTaskFunction,    
     //     "RFID Task",         
     //     4096,                
     //     NULL,                
-    //     1,                   // Mức ưu tiên thấp nhất
+    //     1,
     //     &rfidTask            
     // );
-
-    xTaskCreate(
-        webSocketTaskFunction,
-        "WebSocket Task",     
-        8192,
-        NULL,                  
-        2,
-        &webSocketTask        
-    );
 
     xTaskCreate(
         buttonTaskFunction,
         "Button Task",
         4096,
         NULL,
-        3,
+        4,
         &buttonTask
     );
     
-    // Tạo task cho RFID Mode (nhận diện thẻ để mở khóa)
-    // xTaskCreate(
-    //     rfidModeTaskFunction,
-    //     "RFID Mode Task",
-    //     4096,
-    //     NULL,
-    //     2,                    // Ưu tiên trung bình
-    //     &rfidModeTask
-    // );
+    xTaskCreatePinnedToCore(
+        webSocketTaskFunction,
+        "WebSocket Task",     
+        16384,
+        NULL,                  
+        3,
+        &webSocketTask,
+        1  
+    );
     
+    xTaskCreatePinnedToCore(
+        rfidModeTaskFunction,
+        "RFID Mode Task",
+        4096,
+        NULL,
+        tskIDLE_PRIORITY + 1,                    
+        &rfidModeTask,
+        0
+    );
 
     xTaskCreate(
         fingerprintModeTaskFunction,
@@ -161,5 +157,4 @@ void smartLockSystemUpdate() {
     lockUpdate();
     buttonResetMode();
     clientLoop();
-
 }

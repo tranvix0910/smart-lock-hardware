@@ -15,7 +15,7 @@
 #define MAX_FINGER_ID 99
 
 #define BUTTON_CAPTURE_PIN 26
-#define BUTTON_RESET_PIN 13
+#define BUTTON_RESET_PIN 5
 
 // External declarations for fingerprint enrollment
 extern bool pendingFingerprintEnroll;

@@ -1,4 +1,5 @@
 #include "fingerprint.h"
+#include "freertos/FreeRTOS.h"
 
 HardwareSerial mySerial(2);
 Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
@@ -106,7 +107,7 @@ uint8_t getFingerprintEnroll(int id, DisplayResultCallback displayResultCallback
 
   Serial.println("Remove finger");
   displayResultCallback("Remove finger", TFT_CYAN);
-  delay(2000);
+  vTaskDelay(2000 / portTICK_PERIOD_MS);
   p = 0;
   while (p != FINGERPRINT_NOFINGER) {
     p = finger.getImage();
@@ -198,7 +199,7 @@ uint8_t getFingerprintEnroll(int id, DisplayResultCallback displayResultCallback
     Serial.println("Stored!");
     snprintf(message, sizeof(message), "ID #%d stored!", id);
     displayResultCallback(message, TFT_GREEN);
-    delay(3000);
+    vTaskDelay(3000 / portTICK_PERIOD_MS);
     isNormalMode = true;
   } else if (p == FINGERPRINT_PACKETRECIEVEERR) {
     Serial.println("Communication error");
@@ -293,7 +294,7 @@ bool unlockWithFingerprint(DisplayResultCallback displayResultCallback) {
     } else {
         displayResultCallback("Access Denied!", TFT_RED);
         Serial.println("Fingerprint not verified!");
-        delay(1000);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
         isNormalMode = true;
         incrementFailedAttempt();
         publishRecentAccessLogs("FINGERPRINT", "FAILED", "Unknown", "Access Denied");

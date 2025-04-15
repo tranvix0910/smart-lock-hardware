@@ -3,10 +3,15 @@
 // Define global variables
 // String livenessCheckResult = "";
 String livenessCheckResult = "Liveness Check Passed";
+String notes = "";
 extern String userId;
 extern String deviceId;
 String faceId = "";
 const char* user_name = "Undefined";
+
+extern bool pendingDeleteFingerprint;
+extern bool pendingFingerprintEnroll;
+extern bool pendingRFIDEnroll;
 
 String convertToVietnamTime(String isoTimestamp) {
     // Trích xuất năm, tháng, ngày, giờ, phút, giây từ chuỗi timestamp
@@ -75,7 +80,7 @@ void parsingJSONResult(String response, uint16_t SCREEN_COLOR, String message, S
     String timestamp = doc["timestamp"];
     String vietnamTime = convertToVietnamTime(timestamp);
 
-    publishRecentAccessLogs("FACEID", status, String(user_name), livenessCheckResult);
+    publishRecentAccessLogs("FACEID", status, String(user_name), notes);
 
     displayJSONParsingResult(SCREEN_COLOR, message, livenessCheckResult, user_name, vietnamTime, similarity, failedAttempts);
 }
@@ -233,6 +238,18 @@ bool authenticateFace(WebsocketsMessage msg) {
 
     // bool isLiveness = livenessCheck(msg);
     bool isLiveness = true;
+
+    if(pendingDeleteFingerprint){
+        notes = "Delete Fingerprint";
+    }
+
+    if(pendingFingerprintEnroll){
+        notes = "Enroll Fingerprint";
+    }
+
+    if(pendingRFIDEnroll){
+        notes = "Enroll RFID";
+    }
     
     if(!isLiveness) {
         Serial.println("Liveness check failed");
@@ -262,7 +279,6 @@ bool authenticateFace(WebsocketsMessage msg) {
                     Serial.println("Warning: Response doesn't contain faceId");
                     faceId = "unknown";
                 }
-                
                 parsingJSONResult(response, TFT_GREEN, "Authentication Success!", livenessCheckResult, failedAttempts, "AUTHENTICATION SUCCESS");
                 resetFailedAttempts();
                 Serial.println("Face authentication successful");

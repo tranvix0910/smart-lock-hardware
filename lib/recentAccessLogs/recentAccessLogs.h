@@ -3,10 +3,11 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#include <mqtt.h>
 #include <PubSubClient.h>
 #include <WiFiClientSecure.h>
-#include "wifi_config.h"
+
+extern void publishMessage(const char* topic, const char* message);
+extern void getDeviceInfoValues(const char* &deviceIdPtr, const char* &userIdPtr);
 
 extern String topicRecentAccessPublish;
 extern String topicRecentAccessSubscribe;
