@@ -17,6 +17,10 @@ extern bool isSystemLocked;
 extern uint8_t failedAttempts;
 extern bool doorHasBeenOpened;
 
+extern bool isEmergencyLocked;
+extern unsigned long emergencyLockStartTime;
+extern const unsigned long EMERGENCY_LOCK_DURATION;
+
 void lockInit();
 void lockOpen();
 void lockClose();
@@ -24,7 +28,9 @@ void lockUpdate();
 void checkDoorStatus();
 void incrementFailedAttempt();
 void resetFailedAttempts();
-bool isSystemLockedOut();
 void unlockSystem();
+
+void emergencyLockSystem();
+bool checkEmergencyLockStatus();
 
 #endif

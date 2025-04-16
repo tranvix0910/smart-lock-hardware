@@ -15,6 +15,29 @@ const uint16_t websockets_server_port = 8888;
 using namespace websockets;
 WebsocketsClient client;
 
+unsigned long lastConnectionAttempt = 0;
+const unsigned long RECONNECT_INTERVAL = 3000;
+bool isConnected = false;
+
+bool connectToWebSocket() {
+  Serial.print("Connecting to WebSocket server at ");
+  Serial.print(websockets_server_host);
+  Serial.print(":");
+  Serial.println(websockets_server_port);
+  
+  bool connected = client.connect(websockets_server_host, websockets_server_port, "/");
+  
+  if (connected) {
+    Serial.println("Socket Connected!");
+    isConnected = true;
+  } else {
+    Serial.println("Socket Connection Failed!");
+    isConnected = false;
+  }
+  
+  return connected;
+}
+
 void setup() {
   Serial.begin(115200);
   Serial.setDebugOutput(true);
@@ -58,6 +81,28 @@ void setup() {
     return;
   }
 
+  sensor_t * s = esp_camera_sensor_get();
+  if (s) {
+    s->set_brightness(s, 1);
+    s->set_contrast(s, 1);
+    s->set_saturation(s, 1);
+    s->set_special_effect(s, 0);
+    s->set_whitebal(s, 1);
+    s->set_awb_gain(s, 1);
+    s->set_gain_ctrl(s, 1);
+    s->set_agc_gain(s, 30);
+    s->set_aec_value(s, 500);
+    s->set_ae_level(s, 0);
+    s->set_exposure_ctrl(s, 1);
+    s->set_denoise(s, 1);
+    s->set_sharpness(s, 1);
+    s->set_dcw(s, 1);
+    s->set_raw_gma(s, 1);
+    s->set_lenc(s, 1);
+    s->set_wpc(s, 1);
+    s->set_bpc(s, 1);
+  }
+
   WiFi.begin(ssid, password);
 
   while (WiFi.status() != WL_CONNECTED) {
@@ -71,30 +116,54 @@ void setup() {
   Serial.print(WiFi.localIP());
   Serial.println("' to connect");
 
-  while(!client.connect(websockets_server_host, websockets_server_port, "/")){
-    delay(500);
-    Serial.print(".");
-  }
-
-  Serial.println("Socket Connected!");  
+  connectToWebSocket();
+  lastConnectionAttempt = millis();
 }
 
 void loop() {
-  camera_fb_t *fb = NULL;
-  esp_err_t res = ESP_OK;
-  fb = esp_camera_fb_get();
-  if(!fb){
-    Serial.println("Camera capture failed");
+  if (!client.available()) {
+    if (isConnected) {
+      Serial.println("WebSocket connection lost!");
+      isConnected = false;
+    }
+    
+    unsigned long currentTime = millis();
+    if (currentTime - lastConnectionAttempt >= RECONNECT_INTERVAL) {
+      Serial.println("Attempting to reconnect...");
+      connectToWebSocket();
+      lastConnectionAttempt = currentTime;
+      return;
+    }
+    
+    delay(100);
+    return;
+  }
+  
+  client.poll();
+  
+  if (isConnected) {
+    camera_fb_t *fb = NULL;
+    esp_err_t res = ESP_OK;
+    fb = esp_camera_fb_get();
+    if(!fb){
+      Serial.println("Camera capture failed");
+      esp_camera_fb_return(fb);
+      return;
+    }
+
+    size_t fb_len = 0;
+    if(fb->format != PIXFORMAT_JPEG){
+      Serial.println("Non-JPEG data not implemented");
+      return;
+    }
+
+    if (client.available()) {
+      if (!client.sendBinary((const char*) fb->buf, fb->len)) {
+        Serial.println("Failed to send image, connection might be lost");
+        isConnected = false;
+      }
+    }
+    
     esp_camera_fb_return(fb);
-    return;
   }
-
-  size_t fb_len = 0;
-  if(fb->format != PIXFORMAT_JPEG){
-    Serial.println("Non-JPEG data not implemented");
-    return;
-  }
-
-  client.sendBinary((const char*) fb->buf, fb->len);
-  esp_camera_fb_return(fb);
 }

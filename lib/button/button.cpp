@@ -1,34 +1,16 @@
 #include "button.h"
-#include "rfid.h"
 
-extern String deviceId;
-extern String macAddress;
-extern String userId;
-extern String faceId;
+extern bool isAddingCard;
 
-extern String topicAddFingerprintPublish;
-extern String topicDeleteFingerprintPublish;
-
-bool isNormalMode = true;
 bool lastButtonStateCapture = HIGH;
 bool lastButtonStateReset = HIGH;
 unsigned long lastCheck = 0;
 bool isFirstRun = true;
 unsigned long buttonPressStartTime = 0;
 
-// Variables for server-requested fingerprint enrollment are declared in mqtt.cpp
-extern bool pendingFingerprintEnroll;
-extern String pendingFaceId;
-
-// Variables for server-requested RFID enrollment are declared in mqtt.cpp
-extern bool pendingRFIDEnroll;
-extern String pendingRFIDFaceId;
-extern String failedRFIDEnroll;
-
-// Check for pending fingerprint deletion request
-extern bool pendingDeleteFingerprint;
-extern String pendingDeleteFaceId;
-extern int pendingDeleteFingerprintId;
+bool isRemovalJustCompleted = false;
+unsigned long lastRemovalTime = 0;
+#define REMOVAL_COOLDOWN_TIME 2000 // 2 giây
 
 #define RESET_PRESS_TIME 5000
 
@@ -78,12 +60,13 @@ void buttonResetMode() {
             publishMessage(topicDelete.c_str(), jsonString.c_str());
             Serial.println("Delete request sent: " + jsonString);
             Serial.println("Waiting for server confirmation...");
-            delay(2000);
+            vTaskDelay(2000 / portTICK_PERIOD_MS);
         }
     }
 }
 
 void enrollFingerprint(DisplayResultCallback displayResultCallback) {
+
     bool faceAuthenticated = faceAuthentication();
 
     if (!faceAuthenticated) {
@@ -135,17 +118,14 @@ void enrollFingerprint(DisplayResultCallback displayResultCallback) {
     
     bool success = getFingerprintEnroll(newFingerID, displayResultCallback);
     
-    // If this is a server-requested enrollment, send the result back
     if (pendingFingerprintEnroll && success) {
-        // Get fingerprint template as base64
+        
         String fingerprintTemplate = getLatestFingerprintTemplateAsBase64(newFingerID);
         
         if (fingerprintTemplate.length() > 0) {
             Serial.println("Successfully retrieved fingerprint template");
             Serial.printf("Template length (base64): %d bytes\n", fingerprintTemplate.length());
             
-            // Create a document with dynamic size based on template size
-            // Add extra space for metadata
             size_t jsonCapacity = fingerprintTemplate.length() + 300;
             DynamicJsonDocument resultDoc(jsonCapacity);
             
@@ -160,7 +140,6 @@ void enrollFingerprint(DisplayResultCallback displayResultCallback) {
         } else {
             Serial.println("Failed to retrieve fingerprint template");
             
-            // Send basic success message without template
             StaticJsonDocument<200> resultDoc;
             resultDoc["fingerprintId"] = newFingerID;
             resultDoc["mode"] = "ADD FINGERPRINT SUCCESS (NO TEMPLATE)";
@@ -172,11 +151,10 @@ void enrollFingerprint(DisplayResultCallback displayResultCallback) {
             Serial.println("Sent enrollment result without template data");
         }
         
-        // Reset the pending state
         pendingFingerprintEnroll = false;
         pendingFaceId = "";
+        isNormalMode = true;
     } else if (pendingFingerprintEnroll && !success) {
-        // Send failure to server
         StaticJsonDocument<200> resultDoc;
         resultDoc["faceId"] = pendingFaceId;
         resultDoc["mode"] = "ADD FINGERPRINT FAILED";
@@ -187,9 +165,9 @@ void enrollFingerprint(DisplayResultCallback displayResultCallback) {
         publishMessage(topicAddFingerprintPublish.c_str(), resultJson.c_str());
         Serial.println("Sent enrollment failure: " + resultJson);
         
-        // Reset the pending state
         pendingFingerprintEnroll = false;
         pendingFaceId = "";
+        isNormalMode = true;
     }
 }
 
@@ -242,10 +220,9 @@ void processDeleteFingerprint(uint8_t id, DisplayResultCallback displayResultCal
     Serial.printf("Deleting fingerprint with ID: %d\n", id);
     
     bool success = deleteFingerprint(id, displayResultCallback);
-    
-    // If this was a server-requested deletion, send the result back
+
     if (pendingDeleteFingerprint) {
-        // Send result to server
+
         StaticJsonDocument<200> resultDoc;
         resultDoc["faceId"] = pendingDeleteFaceId;
         resultDoc["fingerprintId"] = pendingDeleteFingerprintId;
@@ -264,7 +241,6 @@ void processDeleteFingerprint(uint8_t id, DisplayResultCallback displayResultCal
         publishMessage(topicDeleteFingerprintPublish.c_str(), resultJson.c_str());
         Serial.println("Sent deletion result: " + resultJson);
         
-        // Reset the pending state
         pendingDeleteFingerprint = false;
         pendingDeleteFaceId = "";
         pendingDeleteFingerprintId = -1;
@@ -278,6 +254,8 @@ void enrollRFID(DisplayResultCallback displayResultCallback) {
     if (!faceAuthenticated) {
         displayResultCallback("Face auth required!", TFT_ORANGE);
         Serial.println("Face authentication required before RFID enrollment");
+        isAddingCard = false;
+        isNormalMode = true;
         return;
     }
 
@@ -300,11 +278,13 @@ void enrollRFID(DisplayResultCallback displayResultCallback) {
         publishMessage(topicAddRFIDCardPublish.c_str(), resultJson.c_str());
         Serial.println("Sent face ID mismatch error: " + resultJson);
         
-        // Reset the pending state
         pendingRFIDEnroll = false;
         pendingRFIDFaceId = "";
+        isNormalMode = true;
+        isAddingCard = false;
         return;
     }
+
     Serial.println("Face ID match confirmed, proceeding with RFID enrollment");
     
     isNormalMode = false;
@@ -333,7 +313,7 @@ void enrollRFID(DisplayResultCallback displayResultCallback) {
         displayResultCallback("Card added to account!", TFT_GREEN);
     } else {
         Serial.println("RFID card enrollment failed");
-        
+
         StaticJsonDocument<200> resultDoc;
         resultDoc["faceId"] = pendingRFIDFaceId;
         resultDoc["mode"] = failedRFIDEnroll;
@@ -345,9 +325,81 @@ void enrollRFID(DisplayResultCallback displayResultCallback) {
         Serial.println("Sent RFID enrollment failure: " + resultJson);
     }
     
+    Serial.println("Resetting pending RFID enrollment request");
     pendingRFIDEnroll = false;
     pendingRFIDFaceId = "";
     isNormalMode = true;
+    isAddingCard = false;
+}
+
+void processRemoveRFIDCard(DisplayResultCallback displayResultCallback, uint8_t* targetUID, uint8_t targetUIDLength) {
+    
+    bool faceAuthenticated = faceAuthentication();
+
+    if (!faceAuthenticated) {
+        displayResultCallback("Face auth required!", TFT_ORANGE);
+        Serial.println("Face authentication required before RFID card removal");
+    }
+    
+    if (pendingRemoveRFIDCard) {
+        Serial.println("Face authenticated, checking if face IDs match");
+        Serial.println("Authenticated Face ID: " + faceId);
+        Serial.println("Requested Face ID: " + pendingRemoveRFIDCardFaceId);
+        
+        if (faceId != pendingRemoveRFIDCardFaceId) {
+            Serial.println("Face ID mismatch! Cannot remove RFID card for different face");
+            displayResultCallback("Face ID mismatch!", TFT_RED);
+            
+            StaticJsonDocument<200> resultDoc;
+            resultDoc["faceId"] = pendingRemoveRFIDCardFaceId;
+            resultDoc["authenticatedFaceId"] = faceId;
+            resultDoc["cardUID"] = pendingRemoveRFIDCardUID;
+            resultDoc["mode"] = "REMOVE RFID CARD FAILED: FACE ID MISMATCH";
+            
+            String resultJson;
+            serializeJson(resultDoc, resultJson);
+            
+            publishMessage(topicRemoveRFIDCardPublish.c_str(), resultJson.c_str());
+            Serial.println("Sent face ID mismatch error: " + resultJson);
+            
+            pendingRemoveRFIDCard = false;
+            pendingRemoveRFIDCardFaceId = "";
+            pendingRemoveRFIDCardUID = "";
+            pendingRemoveRFIDCardUIDLength = "4 Bytes";
+        }
+        Serial.println("Face ID match confirmed, proceeding with RFID card removal");
+    }
+    
+    displayResultCallback("Removing card...", TFT_CYAN);
+    
+    Serial.printf("Removing RFID card with UID: %s\n", pendingRemoveRFIDCardUID.c_str());
+    
+    bool success = removeCard(targetUID, targetUIDLength);
+    
+    if (pendingRemoveRFIDCard) {
+        StaticJsonDocument<200> resultDoc;
+        resultDoc["faceId"] = pendingRemoveRFIDCardFaceId;
+        resultDoc["cardUID"] = pendingRemoveRFIDCardUID;
+        
+        if (success) {
+            resultDoc["mode"] = "REMOVE RFID CARD SUCCESS";
+            displayResultCallback("Card removed!", TFT_GREEN);
+        } else {
+            resultDoc["mode"] = "REMOVE RFID CARD FAILED";
+            displayResultCallback("Removal failed", TFT_RED);
+        }
+        
+        String resultJson;
+        serializeJson(resultDoc, resultJson);
+        
+        publishMessage(topicRemoveRFIDCardPublish.c_str(), resultJson.c_str());
+        Serial.println("Sent removal result: " + resultJson);
+        
+        pendingRemoveRFIDCard = false;
+        pendingRemoveRFIDCardFaceId = "";
+        pendingRemoveRFIDCardUID = "";
+        pendingRemoveRFIDCardUIDLength = "4 Bytes";
+    }
 }
 
 void buttonEvent(
@@ -364,6 +416,7 @@ void buttonEvent(
     if (millis() - lastCheck < 100) {
         return;
     }
+
     lastCheck = millis();
     
     if (isFirstRun) {
@@ -373,6 +426,12 @@ void buttonEvent(
                       String(lastButtonStateCapture == HIGH ? "HIGH (not pressed)" : "LOW (pressed)"));
         lastMillis = newMillis;
         return;
+    }
+
+    if (isRemovalJustCompleted && (millis() - lastRemovalTime < REMOVAL_COOLDOWN_TIME)) {
+        return;
+    } else if (isRemovalJustCompleted) {
+        isRemovalJustCompleted = false;
     }
 
     if(pendingDeleteFingerprint){
@@ -385,6 +444,10 @@ void buttonEvent(
 
     if(pendingRFIDEnroll){
         displayCornerText("Enrolling RFID", TFT_BLUE, 1);
+    }
+
+    if(pendingRemoveRFIDCard){
+        displayCornerText("Removing RFID", TFT_RED, 1);
     }
 
     if (newMillis - lastMillis > 50) { 
@@ -408,15 +471,10 @@ void buttonEvent(
                 return;
             }
 
-            if (isSystemLockedOut()) {
-                displayResultCallback("System Locked!", TFT_RED);
-                return;
-            }
-
             if (pendingDeleteFingerprint) {
                 Serial.println("Processing pending fingerprint deletion request");
                 displayResultCallback("Authenticating face", TFT_ORANGE);
-                delay(3000);
+                vTaskDelay(3000 / portTICK_PERIOD_MS);
                 
                 processDeleteFingerprint(pendingDeleteFingerprintId, displayResultCallback);
                 
@@ -424,7 +482,7 @@ void buttonEvent(
             } else if (pendingFingerprintEnroll) {
                 Serial.println("Processing pending fingerprint enrollment request");
                 displayResultCallback("Authenticating face", TFT_ORANGE);
-                delay(3000);
+                vTaskDelay(3000 / portTICK_PERIOD_MS);
                 
                 enrollFingerprint(displayResultCallback);
 
@@ -434,16 +492,37 @@ void buttonEvent(
             } else if (pendingRFIDEnroll) {
                 Serial.println("Processing pending RFID enrollment request");
                 displayResultCallback("Authenticating face", TFT_ORANGE);
-                delay(3000);
-
+                vTaskDelay(3000 / portTICK_PERIOD_MS);
+                
+                isAddingCard = true;
                 enrollRFID(displayResultCallback);
 
                 pendingRFIDEnroll = false;
                 pendingRFIDFaceId = "";
                 return;
+            } else if (pendingRemoveRFIDCard) {
+                Serial.println("Processing pending RFID card removal request");
+                displayResultCallback("Authenticating face", TFT_ORANGE);
+                vTaskDelay(3000 / portTICK_PERIOD_MS);
+
+                uint8_t cardUID[10];
+                uint8_t uidLength = 0;
+                
+                String uidStr = pendingRemoveRFIDCardUID;
+                int idx = 0;
+                int pos = 0;
+                
+                while (pos < uidStr.length() && idx < 10) {
+                    int delimPos = uidStr.indexOf(':', pos);
+                    String byteStr = (delimPos > 0) ? uidStr.substring(pos, delimPos) : uidStr.substring(pos);
+                    cardUID[idx++] = (uint8_t)strtol(byteStr.c_str(), NULL, 16);
+                    pos = (delimPos > 0) ? delimPos + 1 : uidStr.length();
+                }
+                uidLength = idx;
+                
+                processRemoveRFIDCard(displayResultCallback, cardUID, uidLength);
             }
 
-            // Long press to add fingerprint
             if (pressDuration >= LONG_PRESS_TIME) {
                 Serial.println("Long press detected: Add Fingerprint");
                 enrollFingerprint(displayResultCallback);
