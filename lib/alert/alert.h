@@ -8,6 +8,7 @@
 void alertInit();
 void alertTurnOn();
 void alertTurnOff();
+void alertBeep(int duration = 200);
 
 #endif
 

@@ -3,16 +3,20 @@
 
 #include <Arduino.h>
 #include <Wire.h>
-#include <Adafruit_PN532.h>
 #include <TFT_eSPI.h>
 #include <ArduinoJson.h>
+#include <Adafruit_PN532.h>
 #include "common.h"
 #include "lock.h"
 #include "eeprom_manager.h"
 #include "smart_lock_system.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 
 #define SDA_PIN 21
 #define SCL_PIN 22
+
+extern SemaphoreHandle_t i2cMutex;
 
 extern String failedRFIDEnroll;
 

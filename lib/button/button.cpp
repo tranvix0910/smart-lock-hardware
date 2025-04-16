@@ -1,7 +1,15 @@
 #include "button.h"
+#include "rfid.h"
 
-extern bool isAddingCard;
+extern String deviceId;
+extern String macAddress;
+extern String userId;
+extern String faceId;
 
+extern String topicAddFingerprintPublish;
+extern String topicDeleteFingerprintPublish;
+
+bool isNormalMode = true;
 bool lastButtonStateCapture = HIGH;
 bool lastButtonStateReset = HIGH;
 unsigned long lastCheck = 0;
@@ -492,9 +500,8 @@ void buttonEvent(
             } else if (pendingRFIDEnroll) {
                 Serial.println("Processing pending RFID enrollment request");
                 displayResultCallback("Authenticating face", TFT_ORANGE);
-                vTaskDelay(3000 / portTICK_PERIOD_MS);
-                
-                isAddingCard = true;
+                delay(3000);
+
                 enrollRFID(displayResultCallback);
 
                 pendingRFIDEnroll = false;

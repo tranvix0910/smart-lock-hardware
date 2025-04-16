@@ -1,5 +1,11 @@
 #include "user_interface.h"
+<<<<<<< HEAD
 
+=======
+#include "mqtt.h"
+#include "rfid.h"
+#include "freertos/FreeRTOS.h"
+>>>>>>> 866cf2b8f8c32aa2c680b131271d449053364145
 SemaphoreHandle_t wsMutex = NULL;
 QueueHandle_t buttonEventQueue = NULL;
 
@@ -214,6 +220,7 @@ void displayInit() {
     
     // Thiết lập văn bản với màu sắc mới
     tft.setTextDatum(TC_DATUM);
+<<<<<<< HEAD
     
     // Xóa vùng văn bản để tránh chồng chữ
     int titleY = logoY + lockSize + 30;
@@ -324,6 +331,11 @@ void displayInit() {
     }
     
     delay(300);
+=======
+    tft.drawString("Smart Door System", 120, 80, GFXFF);
+    tft.drawString("Initializing...", 120, 120, GFXFF);
+    vTaskDelay(2000 / portTICK_PERIOD_MS);  
+>>>>>>> 866cf2b8f8c32aa2c680b131271d449053364145
     tft.setRotation(1);
     tft.fillScreen(TFT_BLACK);
     

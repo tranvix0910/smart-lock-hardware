@@ -2,13 +2,87 @@
 #include "alert.h"
 
 extern TaskHandle_t buttonTask;
+<<<<<<< HEAD
 extern TaskHandle_t rfidModeTask;
+=======
+SemaphoreHandle_t i2cMutex = NULL;
+>>>>>>> 866cf2b8f8c32aa2c680b131271d449053364145
 String failedRFIDEnroll = "";
 
 Adafruit_PN532 nfcI2C(SDA_PIN, SCL_PIN);
 
 void rfidInit() {
     Serial.println("Initializing RFID module...");
+<<<<<<< HEAD
+=======
+    
+    // Tạo mutex cho I2C
+    if (i2cMutex == NULL) {
+        i2cMutex = xSemaphoreCreateMutex();
+        if (i2cMutex == NULL) {
+            Serial.println("ERROR: Could not create I2C mutex!");
+        }
+    }
+    
+    pinMode(SDA_PIN, INPUT_PULLUP);
+    pinMode(SCL_PIN, INPUT_PULLUP);
+
+    // Reset I2C bus trước khi bắt đầu
+    Wire.end();
+    delay(100);
+    
+    Wire.begin(SDA_PIN, SCL_PIN);
+    Wire.setClock(50000);  // Giảm tốc độ để tăng ổn định
+    Wire.setTimeout(2000); // Tăng timeout
+    
+    delay(100);
+    
+    if (xSemaphoreTake(i2cMutex, portMAX_DELAY) == pdTRUE) {
+        nfcI2C.begin();
+        delay(50);
+        
+        uint32_t versiondata = nfcI2C.getFirmwareVersion();
+        if (!versiondata) {
+            Serial.println("ERROR: Couldn't find PN53x board. Check connections!");
+            xSemaphoreGive(i2cMutex);
+            return;
+        }
+
+        // Hiển thị thông tin của chip
+        Serial.print("Found chip PN5"); Serial.println((versiondata>>24) & 0xFF, HEX);
+        Serial.print("Firmware ver. "); Serial.print((versiondata>>16) & 0xFF, DEC);
+        Serial.print('.'); Serial.println((versiondata>>8) & 0xFF, DEC);
+
+        // Cấu hình RFID reader
+        nfcI2C.SAMConfig();
+        Serial.println("RFID Reader Configured");
+        
+        // Đọc số lượng thẻ đã đăng ký trong EEPROM
+        int cardCount = 0;
+        for (uint16_t i = 0; i < MAX_RFID_CARDS; i++) {
+            uint16_t addr = RFID_START_ADDR + (i * RFID_CARD_SIZE);
+            if (EEPROM.read(addr) != RFID_EMPTY_SLOT) {
+                cardCount++;
+            }
+        }
+        Serial.print("Found "); Serial.print(cardCount); Serial.println(" registered RFID cards in memory");
+        
+        // Khởi tạo biến toàn cục cho RFID
+        isNormalMode = true;
+        
+        Serial.println("RFID module initialization complete");
+        xSemaphoreGive(i2cMutex);
+    }
+}
+
+void rfidRead() {
+    if (xSemaphoreTake(i2cMutex, 100 / portTICK_PERIOD_MS) != pdTRUE) {
+        return;
+    }
+    
+    static bool cardDetected = false;
+    static unsigned long lastCardTime = 0;
+>>>>>>> 866cf2b8f8c32aa2c680b131271d449053364145
     
     pinMode(SDA_PIN, INPUT_PULLUP);
     pinMode(SCL_PIN, INPUT_PULLUP);
@@ -35,6 +109,7 @@ void rfidInit() {
     Serial.print('.'); 
     Serial.println((versiondata>>8) & 0xFF, DEC);
 
+<<<<<<< HEAD
     nfcI2C.SAMConfig();
     Serial.println("RFID Reader Configured");
     
@@ -50,6 +125,51 @@ void rfidInit() {
     Serial.print(cardCount); 
     Serial.println(" registered RFID cards in memory");
     Serial.println("RFID module initialization complete");
+=======
+    if (success) {
+        if (!cardDetected || (currentTime - lastCardTime > 3000)) {
+            Serial.println("Found an ISO14443A card");
+            Serial.print("  UID Length: ");Serial.print(uidLength, DEC);Serial.println(" bytes");
+            Serial.print("  UID Value: ");
+            nfcI2C.PrintHex(uid, uidLength);
+
+            // Phát tiếng bíp khi phát hiện thẻ
+            alertBeep(100);
+
+            if (uidLength == 4){
+                uint32_t cardid = uid[0];
+                cardid <<= 8;
+                cardid |= uid[1];
+                cardid <<= 8;
+                cardid |= uid[2];
+                cardid <<= 8;
+                cardid |= uid[3];
+                Serial.print("Seems to be a Mifare Classic card #");
+                Serial.println(cardid);
+
+                // Kiểm tra quyền truy cập
+                if (EEPROMManager::isRFIDCardExists(uid, uidLength)) {
+                    Serial.println("Access granted - Card is registered");
+                    // Phát tiếng bíp khi thẻ hợp lệ
+                    alertBeep(200);
+                } else {
+                    Serial.println("Access denied - Card is not registered");
+                    // Không cần tiếng bíp khi thẻ không hợp lệ
+                }
+            }
+            Serial.println("");
+            
+            cardDetected = true;
+            lastCardTime = currentTime;
+        }
+    } else {
+        if (currentTime - lastCardTime > 1000) {
+            cardDetected = false;
+        }
+    }
+    
+    xSemaphoreGive(i2cMutex);
+>>>>>>> 866cf2b8f8c32aa2c680b131271d449053364145
 }
 
 // void rfidRead() {
@@ -120,8 +240,15 @@ bool handleAddNewCard(DisplayResultCallback displayResultCallback, uint8_t* uid,
             Serial.print("UID Value: ");
             nfcI2C.PrintHex(currentUID, currentLength);
             
+<<<<<<< HEAD
             alertBeep(100);
             
+=======
+            // Phát tiếng bíp khi phát hiện thẻ
+            alertBeep(100);
+            
+            // Kiểm tra xem thẻ đã tồn tại chưa
+>>>>>>> 866cf2b8f8c32aa2c680b131271d449053364145
             if (EEPROMManager::isRFIDCardExists(currentUID, currentLength)) {
                 failedRFIDEnroll = "ADD RFID CARD FAILED: CARD ALREADY EXISTS";
                 displayResultCallback("Card already exists!", TFT_RED);
@@ -151,9 +278,14 @@ bool handleAddNewCard(DisplayResultCallback displayResultCallback, uint8_t* uid,
     if (addNewCard(currentUID, currentLength)) {
         displayResultCallback("Card registered!", TFT_GREEN);
         Serial.println("Card registered successfully!");
+<<<<<<< HEAD
         alertBeep(200);
         isNormalMode = true;
         isAddingCard = false;
+=======
+        // Phát tiếng bíp thông báo khi đăng ký thẻ thành công
+        alertBeep(200);
+>>>>>>> 866cf2b8f8c32aa2c680b131271d449053364145
         return true;
     } else {
         displayResultCallback("Registration failed", TFT_RED);
@@ -213,6 +345,13 @@ bool unlockWithRFID(DisplayResultCallback displayResultCallback) {
     uint8_t uidLength;
     
     while (!success && (millis() - startTime < timeout)) {
+<<<<<<< HEAD
+=======
+        if (xSemaphoreTake(i2cMutex, 100 / portTICK_PERIOD_MS) != pdTRUE) {
+            vTaskDelay(1);
+            continue;
+        }
+>>>>>>> 866cf2b8f8c32aa2c680b131271d449053364145
         
         success = nfcI2C.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength);
         
@@ -220,6 +359,16 @@ bool unlockWithRFID(DisplayResultCallback displayResultCallback) {
             displayResultCallback("Card detected!", TFT_BLUE);
             Serial.println("RFID card detected!");
             alertBeep(100);
+<<<<<<< HEAD
+=======
+        }
+        
+        xSemaphoreGive(i2cMutex);
+        vTaskDelay(5);
+        
+        if (!success) {
+            vTaskDelay(50 / portTICK_PERIOD_MS);
+>>>>>>> 866cf2b8f8c32aa2c680b131271d449053364145
         }
         
         vTaskDelay(5);
@@ -239,7 +388,11 @@ bool unlockWithRFID(DisplayResultCallback displayResultCallback) {
     
     Serial.print("UID Length: "); Serial.print(uidLength, DEC); Serial.println(" bytes");
     Serial.print("UID Value: ");
-    nfcI2C.PrintHex(uid, uidLength);
+    
+    if (xSemaphoreTake(i2cMutex, portMAX_DELAY) == pdTRUE) {
+        nfcI2C.PrintHex(uid, uidLength);
+        xSemaphoreGive(i2cMutex);
+    }
     
     displayResultCallback("Processing...", TFT_CYAN);
     
@@ -265,6 +418,7 @@ bool unlockWithRFID(DisplayResultCallback displayResultCallback) {
 }
 
 void checkRFIDMode(DisplayResultCallback displayResultCallback) {
+<<<<<<< HEAD
     uint8_t success;
     uint8_t uid[] = { 0, 0, 0, 0, 0, 0, 0 };
     uint8_t uidLength;
@@ -282,11 +436,43 @@ void checkRFIDMode(DisplayResultCallback displayResultCallback) {
             bool unlockSuccess = unlockWithRFID(displayResultCallback);
             if (!unlockSuccess) {
                 isNormalMode = true;
+=======
+    if (xSemaphoreTake(i2cMutex, 50 / portTICK_PERIOD_MS) == pdTRUE) {
+
+        uint8_t success;
+        uint8_t uid[] = { 0, 0, 0, 0, 0, 0, 0 };
+        uint8_t uidLength;
+
+        success = nfcI2C.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength);
+        if (success) {
+            if (isNormalMode) {
+                isNormalMode = false;
+                displayResultCallback("RFID detected...", TFT_CYAN);
+>>>>>>> 866cf2b8f8c32aa2c680b131271d449053364145
             }
+            
+            xSemaphoreGive(i2cMutex);
+            
+            if (!isNormalMode) {
+                Serial.println("Unlocking with RFID...");
+                bool unlockSuccess = unlockWithRFID(displayResultCallback);
+                if (!unlockSuccess) {
+                    isNormalMode = true;
+                }
+            }
+            vTaskDelay(1);
+        } else {
+            xSemaphoreGive(i2cMutex);
+            vTaskDelay(1);
         }
+<<<<<<< HEAD
         vTaskDelay(50 / portTICK_PERIOD_MS);
     } else {
         vTaskDelay(50 / portTICK_PERIOD_MS);
+=======
+    } else {
+        return;
+>>>>>>> 866cf2b8f8c32aa2c680b131271d449053364145
     }
 }
 

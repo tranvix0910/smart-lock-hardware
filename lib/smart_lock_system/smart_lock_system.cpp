@@ -8,6 +8,7 @@
 #include "button.h"
 #include "mqtt.h"
 #include "alert.h"
+#include "esp_task_wdt.h"
 
 // TaskHandle_t rfidTask = NULL;                                       
 TaskHandle_t webSocketTask = NULL;
@@ -15,8 +16,11 @@ TaskHandle_t buttonTask = NULL;
 TaskHandle_t rfidModeTask = NULL;
 TaskHandle_t fingerprintModeTask = NULL;
 
+<<<<<<< HEAD
 bool isAddingCard = false;
 
+=======
+>>>>>>> 866cf2b8f8c32aa2c680b131271d449053364145
 // void rfidTaskFunction(void *parameter) {
 //     for(;;) {
 //         rfidRead();
@@ -27,7 +31,11 @@ bool isAddingCard = false;
 void webSocketTaskFunction(void *parameter) {
     for(;;) {
         websocketHandle();
+<<<<<<< HEAD
         vTaskDelay(10 / portTICK_PERIOD_MS);
+=======
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+>>>>>>> 866cf2b8f8c32aa2c680b131271d449053364145
     }
 }
 
@@ -46,10 +54,15 @@ void buttonTaskFunction(void *parameter) {
 
 void rfidModeTaskFunction(void *parameter) {
     for(;;) {
+<<<<<<< HEAD
         if (!isAddingCard) {
             checkRFIDMode(displayResult);
             vTaskDelay(50 / portTICK_PERIOD_MS);
         }
+=======
+        checkRFIDMode(displayResult);
+        vTaskDelay(10 / portTICK_PERIOD_MS);
+>>>>>>> 866cf2b8f8c32aa2c680b131271d449053364145
     }
 }
 
@@ -113,6 +126,29 @@ void smartLockSystemInit() {
         4,
         &buttonTask
     );
+<<<<<<< HEAD
+=======
+    
+    xTaskCreatePinnedToCore(
+        webSocketTaskFunction,
+        "WebSocket Task",     
+        16384,
+        NULL,                  
+        3,
+        &webSocketTask,
+        1  
+    );
+    
+    xTaskCreatePinnedToCore(
+        rfidModeTaskFunction,
+        "RFID Mode Task",
+        4096,
+        NULL,
+        tskIDLE_PRIORITY + 1,                    
+        &rfidModeTask,
+        0
+    );
+>>>>>>> 866cf2b8f8c32aa2c680b131271d449053364145
 
     xTaskCreate(
         fingerprintModeTaskFunction,
