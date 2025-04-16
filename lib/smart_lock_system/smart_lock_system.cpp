@@ -15,16 +15,8 @@ TaskHandle_t buttonTask = NULL;
 TaskHandle_t rfidModeTask = NULL;
 TaskHandle_t fingerprintModeTask = NULL;
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 bool isAddingCard = false;
 
-=======
->>>>>>> 866cf2b8f8c32aa2c680b131271d449053364145
-=======
-bool isAddingCard = false;
-
->>>>>>> 626d573
 // void rfidTaskFunction(void *parameter) {
 //     for(;;) {
 //         rfidRead();
@@ -35,15 +27,7 @@ bool isAddingCard = false;
 void webSocketTaskFunction(void *parameter) {
     for(;;) {
         websocketHandle();
-<<<<<<< HEAD
-<<<<<<< HEAD
         vTaskDelay(10 / portTICK_PERIOD_MS);
-=======
-        vTaskDelay(100 / portTICK_PERIOD_MS);
->>>>>>> 866cf2b8f8c32aa2c680b131271d449053364145
-=======
-        vTaskDelay(10 / portTICK_PERIOD_MS);
->>>>>>> 626d573
     }
 }
 
@@ -62,21 +46,10 @@ void buttonTaskFunction(void *parameter) {
 
 void rfidModeTaskFunction(void *parameter) {
     for(;;) {
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 626d573
         if (!isAddingCard) {
             checkRFIDMode(displayResult);
             vTaskDelay(50 / portTICK_PERIOD_MS);
         }
-<<<<<<< HEAD
-=======
-        checkRFIDMode(displayResult);
-        vTaskDelay(10 / portTICK_PERIOD_MS);
->>>>>>> 866cf2b8f8c32aa2c680b131271d449053364145
-=======
->>>>>>> 626d573
     }
 }
 
@@ -140,32 +113,6 @@ void smartLockSystemInit() {
         4,
         &buttonTask
     );
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-    
-    xTaskCreatePinnedToCore(
-        webSocketTaskFunction,
-        "WebSocket Task",     
-        16384,
-        NULL,                  
-        3,
-        &webSocketTask,
-        1  
-    );
-    
-    xTaskCreatePinnedToCore(
-        rfidModeTaskFunction,
-        "RFID Mode Task",
-        4096,
-        NULL,
-        tskIDLE_PRIORITY + 1,                    
-        &rfidModeTask,
-        0
-    );
->>>>>>> 866cf2b8f8c32aa2c680b131271d449053364145
-=======
->>>>>>> 626d573
 
     xTaskCreate(
         fingerprintModeTaskFunction,

@@ -1,10 +1,6 @@
 #include "lock.h"
 #include "mqtt.h"
 #include "freertos/FreeRTOS.h"
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 626d573
 #include "alert.h"
 #include "user_interface.h"
 
@@ -17,11 +13,6 @@ bool isEmergencyLocked = false;
 unsigned long emergencyLockStartTime = 0;
 const unsigned long EMERGENCY_LOCK_DURATION = 20000;
 
-<<<<<<< HEAD
-=======
->>>>>>> 866cf2b8f8c32aa2c680b131271d449053364145
-=======
->>>>>>> 626d573
 unsigned long lockOpenTime = 0;
 unsigned long lastDoorCheckTime = 0;
 unsigned long lockOpenWithoutDoorOpenTime = 0;
@@ -43,29 +34,7 @@ void lockInit() {
     isSystemLocked = false;
     failedAttempts = 0;
     doorHasBeenOpened = false;
-<<<<<<< HEAD
-<<<<<<< HEAD
     isEmergencyLocked = false;
-=======
-}
-
-bool isSystemLockedOut() {
-    if (isSystemLocked) {
-        displayResult("System Locked!", TFT_RED);
-        isNormalMode = false;
-        for (int i = 0; i < 3; i++) {
-            alertTurnOn(); 
-            vTaskDelay(200 / portTICK_PERIOD_MS);
-            alertTurnOff();
-            vTaskDelay(200 / portTICK_PERIOD_MS);
-        }
-        return true;
-    }
-    return false;
->>>>>>> 866cf2b8f8c32aa2c680b131271d449053364145
-=======
-    isEmergencyLocked = false;
->>>>>>> 626d573
 }
 
 void unlockSystem() {
