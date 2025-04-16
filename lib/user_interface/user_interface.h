@@ -13,6 +13,8 @@
 #include "freertos/semphr.h"
 #include "freertos/queue.h"
 
+#include "mqtt.h"
+#include "rfid.h"
 #include "api.h"
 #include "button.h"
 #include "motion_detect.h"
@@ -25,6 +27,8 @@ using namespace websockets;
 
 extern WebsocketsServer WebSocketServer;
 extern WebsocketsClient WebSocketClient;
+
+extern bool isNormalMode;
 
 #define GFXFF 1
 #define FSB9 &FreeSerifBold9pt7b
@@ -76,5 +80,6 @@ void displayTurnOn();
 void displayTurnOff();
 void displayCheckMotion();
 void displayResult(String message, uint16_t color);
-
+void displayUnlockScreen();
+void displayEmergencyLockScreen();
 #endif

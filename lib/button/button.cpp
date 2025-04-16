@@ -1,15 +1,16 @@
 #include "button.h"
+<<<<<<< HEAD
 #include "rfid.h"
 
 extern String deviceId;
 extern String macAddress;
 extern String userId;
 extern String faceId;
+=======
+>>>>>>> 626d573
 
-extern String topicAddFingerprintPublish;
-extern String topicDeleteFingerprintPublish;
+extern bool isAddingCard;
 
-bool isNormalMode = true;
 bool lastButtonStateCapture = HIGH;
 bool lastButtonStateReset = HIGH;
 unsigned long lastCheck = 0;
@@ -466,7 +467,7 @@ void buttonEvent(
             pressStartTime = newMillis;
             isButtonPressed = true;
             Serial.println("Button pressed at: " + String(pressStartTime) + " ms");
-
+            isAddingCard = false;
         } else if (statusButtonPinCapture == HIGH && lastButtonStateCapture == LOW) {
 
             lastButtonStateCapture = HIGH;
@@ -476,6 +477,10 @@ void buttonEvent(
             
             if (pressDuration > 10000) {
                 Serial.println("Unreasonable press duration, ignoring: " + String(pressDuration) + " ms");
+<<<<<<< HEAD
+=======
+                isAddingCard = false;
+>>>>>>> 626d573
                 return;
             }
 
@@ -485,7 +490,10 @@ void buttonEvent(
                 vTaskDelay(3000 / portTICK_PERIOD_MS);
                 
                 processDeleteFingerprint(pendingDeleteFingerprintId, displayResultCallback);
-                
+
+                pendingDeleteFingerprint = false;
+                pendingFaceId = "";
+                isAddingCard = false;
                 return;
             } else if (pendingFingerprintEnroll) {
                 Serial.println("Processing pending fingerprint enrollment request");
@@ -496,16 +504,51 @@ void buttonEvent(
 
                 pendingFingerprintEnroll = false;
                 pendingFaceId = "";
+                isAddingCard = false;
                 return;
             } else if (pendingRFIDEnroll) {
                 Serial.println("Processing pending RFID enrollment request");
                 displayResultCallback("Authenticating face", TFT_ORANGE);
+<<<<<<< HEAD
                 delay(3000);
 
+=======
+                vTaskDelay(3000 / portTICK_PERIOD_MS);
+                
+                isAddingCard = true;
+>>>>>>> 626d573
                 enrollRFID(displayResultCallback);
 
                 pendingRFIDEnroll = false;
                 pendingRFIDFaceId = "";
+                isAddingCard = false;
+                return;
+            } else if (pendingRemoveRFIDCard) {
+                Serial.println("Processing pending RFID card removal request");
+                displayResultCallback("Authenticating face", TFT_ORANGE);
+                vTaskDelay(3000 / portTICK_PERIOD_MS);
+
+                uint8_t cardUID[10];
+                uint8_t uidLength = 0;
+                
+                String uidStr = pendingRemoveRFIDCardUID;
+                int idx = 0;
+                int pos = 0;
+                
+                while (pos < uidStr.length() && idx < 10) {
+                    int delimPos = uidStr.indexOf(':', pos);
+                    String byteStr = (delimPos > 0) ? uidStr.substring(pos, delimPos) : uidStr.substring(pos);
+                    cardUID[idx++] = (uint8_t)strtol(byteStr.c_str(), NULL, 16);
+                    pos = (delimPos > 0) ? delimPos + 1 : uidStr.length();
+                }
+                uidLength = idx;
+                
+                processRemoveRFIDCard(displayResultCallback, cardUID, uidLength);
+                pendingRemoveRFIDCard = false;
+                pendingRemoveRFIDCardFaceId = "";
+                pendingRemoveRFIDCardUID = "";
+                pendingRemoveRFIDCardUIDLength = "4 Bytes";
+                isAddingCard = false;
                 return;
             } else if (pendingRemoveRFIDCard) {
                 Serial.println("Processing pending RFID card removal request");
@@ -530,6 +573,10 @@ void buttonEvent(
                 processRemoveRFIDCard(displayResultCallback, cardUID, uidLength);
             }
 
+<<<<<<< HEAD
+=======
+            isAddingCard = false;
+>>>>>>> 626d573
             if (pressDuration >= LONG_PRESS_TIME) {
                 Serial.println("Long press detected: Add Fingerprint");
                 enrollFingerprint(displayResultCallback);

@@ -3,25 +3,53 @@
 
 #include <Arduino.h>
 #include <Adafruit_Fingerprint.h>
+#include <freertos/FreeRTOS.h>
+
 #include "user_interface.h"
 #include "fingerprint.h"
 #include "lock.h"
 #include "mqtt.h"
 #include "api.h"
 #include "recentAccessLogs.h"
+#include "rfid.h"
 
 #define LONG_PRESS_TIME 3000
 #define MIN_FINGER_ID 1
 #define MAX_FINGER_ID 99
 
 #define BUTTON_CAPTURE_PIN 26
-#define BUTTON_RESET_PIN 5
+#define BUTTON_RESET_PIN 13
 
-// External declarations for fingerprint enrollment
 extern bool pendingFingerprintEnroll;
 extern String pendingFaceId;
-extern bool isNormalMode;
 extern uint8_t fingerprintMode;
+
+extern String deviceId;
+extern String macAddress;
+extern String userId;
+extern String faceId;
+
+extern String topicAddFingerprintPublish;
+extern String topicDeleteFingerprintPublish;
+
+extern String topicAddRFIDCardPublish;
+extern String topicRemoveRFIDCardPublish;
+
+extern bool pendingFingerprintEnroll;
+extern String pendingFaceId;
+
+extern bool pendingRFIDEnroll;
+extern String pendingRFIDFaceId;
+extern String failedRFIDEnroll;
+
+extern bool pendingDeleteFingerprint;
+extern String pendingDeleteFaceId;
+extern int pendingDeleteFingerprintId;
+
+extern bool pendingRemoveRFIDCard;
+extern String pendingRemoveRFIDCardFaceId;
+extern String pendingRemoveRFIDCardUID;
+extern String pendingRemoveRFIDCardUIDLength;
 
 typedef void (*HandleImageCallback)();
 typedef void (*DisplayResultCallback)(String message, uint16_t color);
@@ -37,4 +65,6 @@ void buttonEvent(
 );
 void enrollFingerprint(DisplayResultCallback displayResultCallback);
 void processDeleteFingerprint(uint8_t id, DisplayResultCallback displayResultCallback);
+void processRemoveRFIDCard(DisplayResultCallback displayResultCallback, uint8_t* targetUID, uint8_t targetUIDLength);
+
 #endif

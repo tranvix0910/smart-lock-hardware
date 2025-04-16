@@ -22,8 +22,8 @@ extern String topicDeleteFingerprintSubscribe;
 extern String topicAddRFIDCardPublish;
 extern String topicAddRFIDCardSubscribe;
 
-extern String topicDeleteRFIDCardPublish;
-extern String topicDeleteRFIDCardSubscribe;
+extern String topicRemoveRFIDCardPublish;
+extern String topicRemoveRFIDCardSubscribe;
 
 extern String topicRecentAccessPublish;
 extern String topicRecentAccessSubscribe;
@@ -36,6 +36,11 @@ extern String pendingFaceId;
 extern bool pendingDeleteFingerprint;
 extern String pendingDeleteFaceId;
 extern int pendingDeleteFingerprintId;
+
+// RFID enrollment variables
+extern bool pendingRFIDEnroll;
+extern String pendingRFIDFaceId;
+extern String pendingRFIDDeleteUIDLength;
 
 // External functions
 extern void displayResult(String message, uint16_t color);
