@@ -1,6 +1,8 @@
 #include "fingerprint.h"
 #include "freertos/FreeRTOS.h"
 
+extern bool isNormalMode;
+
 HardwareSerial mySerial(2);
 Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
 
@@ -29,18 +31,18 @@ void fingerprintInit() {
     }
 }
 
-uint8_t getFingerprintEnroll(int id, DisplayResultCallback displayResultCallback) {
+bool getFingerprintEnroll(int id, DisplayResultCallback displayResultCallback) {
 
   if (id < 1 || id > 127) {
     Serial.printf("Invalid ID range: %d (must be between 1-127)\n", id);
     displayResultCallback("Invalid ID range!", TFT_RED);
-    return FINGERPRINT_BADLOCATION;
+    return false;
   }
   
   if (!isFingerIDFree(id)) {
     Serial.printf("ID %d already in use\n", id);
     displayResultCallback("ID already used!", TFT_RED);
-    return FINGERPRINT_BADLOCATION;
+    return false;
   }
 
   int p = -1;
@@ -86,23 +88,23 @@ uint8_t getFingerprintEnroll(int id, DisplayResultCallback displayResultCallback
     case FINGERPRINT_IMAGEMESS:
       Serial.println("Image too messy");
       displayResultCallback("Image too messy", TFT_RED);
-      return p;
+      return false;
     case FINGERPRINT_PACKETRECIEVEERR:
       Serial.println("Communication error");
       displayResultCallback("Communication error", TFT_RED);
-      return p;
+      return false;
     case FINGERPRINT_FEATUREFAIL:
       Serial.println("Could not find fingerprint features");
       displayResultCallback("No features found", TFT_RED);
-      return p;
+      return false;
     case FINGERPRINT_INVALIDIMAGE:
       Serial.println("Could not find fingerprint features");
       displayResultCallback("Invalid image", TFT_RED);
-      return p;
+      return false;
     default:
       Serial.println("Unknown error");
       displayResultCallback("Unknown error", TFT_RED);
-      return p;
+      return false;
   }
 
   Serial.println("Remove finger");
@@ -151,23 +153,23 @@ uint8_t getFingerprintEnroll(int id, DisplayResultCallback displayResultCallback
     case FINGERPRINT_IMAGEMESS:
       Serial.println("Image too messy");
       displayResultCallback("Image too messy", TFT_RED);
-      return p;
+      return false;
     case FINGERPRINT_PACKETRECIEVEERR:
       Serial.println("Communication error");
       displayResultCallback("Communication error", TFT_RED);
-      return p;
+      return false;
     case FINGERPRINT_FEATUREFAIL:
       Serial.println("Could not find fingerprint features");
       displayResultCallback("No features found", TFT_RED);
-      return p;
+      return false;
     case FINGERPRINT_INVALIDIMAGE:
       Serial.println("Could not find fingerprint features");
       displayResultCallback("Invalid image", TFT_RED);
-      return p;
+      return false;
     default:
       Serial.println("Unknown error");
       displayResultCallback("Unknown error", TFT_RED);
-      return p;
+      return false;
   }
 
   // OK converted!
@@ -181,15 +183,15 @@ uint8_t getFingerprintEnroll(int id, DisplayResultCallback displayResultCallback
   } else if (p == FINGERPRINT_PACKETRECIEVEERR) {
     Serial.println("Communication error");
     displayResultCallback("Communication error", TFT_RED);
-    return p;
+    return false;
   } else if (p == FINGERPRINT_ENROLLMISMATCH) {
     Serial.println("Fingerprints did not match");
     displayResultCallback("Fingerprints did not match", TFT_RED);
-    return p;
+    return false;
   } else {
     Serial.println("Unknown error");
     displayResultCallback("Unknown error", TFT_RED);
-    return p;
+    return false;
   }
 
   Serial.print("ID "); Serial.println(id);
@@ -199,27 +201,25 @@ uint8_t getFingerprintEnroll(int id, DisplayResultCallback displayResultCallback
     Serial.println("Stored!");
     snprintf(message, sizeof(message), "ID #%d stored!", id);
     displayResultCallback(message, TFT_GREEN);
-    vTaskDelay(3000 / portTICK_PERIOD_MS);
-    isNormalMode = true;
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    return true;
   } else if (p == FINGERPRINT_PACKETRECIEVEERR) {
     Serial.println("Communication error");
     displayResultCallback("Communication error", TFT_RED);
-    return p;
+    return false;
   } else if (p == FINGERPRINT_BADLOCATION) {
     Serial.println("Could not store in that location");
     displayResultCallback("Invalid location (ID)", TFT_RED);
-    return p;
+    return false;
   } else if (p == FINGERPRINT_FLASHERR) {
     Serial.println("Error writing to flash");
     displayResultCallback("Flash memory error", TFT_RED);
-    return p;
+    return false;
   } else {
     Serial.printf("Unknown error: %d\n", p);
     displayResultCallback("Unknown error", TFT_RED);
-    return p;
+    return false;
   }
-
-  return true;
 }
 
 int getFingerprintId() {
@@ -239,12 +239,6 @@ int getFingerprintId() {
 }
 
 bool unlockWithFingerprint(DisplayResultCallback displayResultCallback) {
-
-    if (isSystemLockedOut()) {
-        displayResultCallback("System Locked!", TFT_RED);
-        Serial.println("System locked out!");
-        return false;
-    }
 
     Serial.println("Waiting for finger...");
     

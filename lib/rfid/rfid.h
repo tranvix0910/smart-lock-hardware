@@ -11,19 +11,17 @@
 #include "eeprom_manager.h"
 #include "smart_lock_system.h"
 #include "freertos/FreeRTOS.h"
-#include "freertos/semphr.h"
 
 #define SDA_PIN 21
 #define SCL_PIN 22
 
-extern SemaphoreHandle_t i2cMutex;
-
 extern String failedRFIDEnroll;
+extern bool isAddingCard;
 
 typedef void (*DisplayResultCallback)(String message, uint16_t color);
 
 void rfidInit();
-void rfidRead();
+// void rfidRead();
 
 // Các hàm quản lý thẻ RFID
 bool addNewCard(uint8_t* uid, uint8_t uidLength);
@@ -42,7 +40,6 @@ String createRFIDCardJSON(uint8_t* uid, uint8_t uidLength);
 
 // Unlocking with RFID
 bool unlockWithRFID(DisplayResultCallback displayResultCallback);
-
 void checkRFIDMode(DisplayResultCallback displayResultCallback);
 
 #endif

@@ -4,13 +4,16 @@
 #include <Arduino.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "freertos/semphr.h"
 
 #define TIME_DELAY 1000
 
-extern TaskHandle_t rfidTask;
+// extern TaskHandle_t rfidTask;
 extern TaskHandle_t webSocketTask;
 extern TaskHandle_t buttonTask;
+extern TaskHandle_t rfidModeTask;
+extern TaskHandle_t fingerprintModeTask;
+
+extern bool isAddingCard;
 
 void smartLockSystemInit();
 void smartLockSystemUpdate();

@@ -22,7 +22,7 @@ extern Adafruit_Fingerprint finger;
 typedef void (*DisplayResultCallback)(String message, uint16_t color);
 
 void fingerprintInit();
-uint8_t getFingerprintEnroll(int id, DisplayResultCallback displayResultCallback);
+bool getFingerprintEnroll(int id, DisplayResultCallback displayResultCallback);
 int getFingerprintId();
 bool unlockWithFingerprint(DisplayResultCallback displayResultCallback);
 bool deleteAllFingerprints(DisplayResultCallback displayResultCallback);

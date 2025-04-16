@@ -18,7 +18,6 @@
 
 using namespace websockets;
 
-// Global variables
 extern String livenessCheckResult;
 extern String faceId;
 extern const char* user_name;
@@ -28,7 +27,8 @@ void parsingJSONResult(
     uint16_t SCREEN_COLOR, 
     String message, 
     String livenessCheckResult,
-    uint8_t failedAttempts
+    uint8_t failedAttempts,
+    String status
 );
 void uploadImageToS3(WebsocketsMessage msg);
 bool livenessCheck(WebsocketsMessage msg);

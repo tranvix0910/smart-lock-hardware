@@ -8,13 +8,14 @@
 #include "button.h"
 #include "mqtt.h"
 #include "alert.h"
-#include "esp_task_wdt.h"
 
 // TaskHandle_t rfidTask = NULL;                                       
 TaskHandle_t webSocketTask = NULL;
 TaskHandle_t buttonTask = NULL;
 TaskHandle_t rfidModeTask = NULL;
 TaskHandle_t fingerprintModeTask = NULL;
+
+bool isAddingCard = false;
 
 // void rfidTaskFunction(void *parameter) {
 //     for(;;) {
@@ -26,7 +27,7 @@ TaskHandle_t fingerprintModeTask = NULL;
 void webSocketTaskFunction(void *parameter) {
     for(;;) {
         websocketHandle();
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        vTaskDelay(10 / portTICK_PERIOD_MS);
     }
 }
 
@@ -39,30 +40,35 @@ void buttonTaskFunction(void *parameter) {
                 xSemaphoreGive(wsMutex);
             }
         }
-        vTaskDelay(10 / portTICK_PERIOD_MS);
+        vTaskDelay(50 / portTICK_PERIOD_MS);
     }
 }
 
 void rfidModeTaskFunction(void *parameter) {
     for(;;) {
-        checkRFIDMode(displayResult);
-        vTaskDelay(10 / portTICK_PERIOD_MS);
+        if (!isAddingCard) {
+            checkRFIDMode(displayResult);
+            vTaskDelay(50 / portTICK_PERIOD_MS);
+        }
     }
 }
 
 void fingerprintModeTaskFunction(void *parameter) {
     for(;;) {
         checkFingerprintMode(displayResult);
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        vTaskDelay(200 / portTICK_PERIOD_MS);
     }
 }
 
 void smartLockSystemInit() {
     Serial.begin(115200);
+    
     delay(TIME_DELAY);
     
-    Serial.println("Initializing WiFi...");
+    displayInit();
     wifiConfigInit();
+    
+    Serial.println("Initializing WiFi...");
     while (wifiMode != 1) {
         wifiConfigRun();
         delay(100);
@@ -71,7 +77,6 @@ void smartLockSystemInit() {
     Serial.println("WiFi connected successfully, initializing other modules...");
     
     Serial.println("Initializing basic hardware...");
-    displayInit();
     wifiAPSetup();
     websocketInit();
     
@@ -108,26 +113,6 @@ void smartLockSystemInit() {
         4,
         &buttonTask
     );
-    
-    xTaskCreatePinnedToCore(
-        webSocketTaskFunction,
-        "WebSocket Task",     
-        16384,
-        NULL,                  
-        3,
-        &webSocketTask,
-        1  
-    );
-    
-    xTaskCreatePinnedToCore(
-        rfidModeTaskFunction,
-        "RFID Mode Task",
-        4096,
-        NULL,
-        tskIDLE_PRIORITY + 1,                    
-        &rfidModeTask,
-        0
-    );
 
     xTaskCreate(
         fingerprintModeTaskFunction,
@@ -138,12 +123,38 @@ void smartLockSystemInit() {
         &fingerprintModeTask
     );
     
+    xTaskCreatePinnedToCore(
+        webSocketTaskFunction,
+        "WebSocket Task",     
+        4096,
+        NULL,                  
+        4,
+        &webSocketTask,
+        1  
+    );
+    
+    xTaskCreatePinnedToCore(
+        rfidModeTaskFunction,
+        "RFID Mode Task",
+        4096,
+        NULL,
+        2,                    
+        &rfidModeTask,
+        0
+    );
+    
     Serial.println("Smart Lock System initialization complete!");
 }
 
 void smartLockSystemUpdate() {
+
     if (wifiMode != 1) {
         wifiConfigRun();
+        return;
+    }
+    
+    // Kiểm tra trạng thái khóa khẩn cấp trước khi làm bất cứ điều gì khác
+    if (checkEmergencyLockStatus()) {
         return;
     }
     
@@ -151,6 +162,14 @@ void smartLockSystemUpdate() {
     // - websocketHandle() -> webSocketTaskFunction
     // - checkFingerprintMode() -> fingerprintModeTaskFunction
     // - checkRFIDMode() -> rfidModeTaskFunction
+
+    static uint32_t lastStatusTime = 0;
+    uint32_t currentTime = millis();
+    
+    if (currentTime - lastStatusTime > 30000) {
+        Serial.println("System running normally. Memory free: " + String(ESP.getFreeHeap()) + " bytes");
+        lastStatusTime = currentTime;
+    }
     
     // Motion Detection
     displayCheckMotion();
