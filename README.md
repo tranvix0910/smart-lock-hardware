@@ -272,5 +272,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
   <p>
     <i>Smart Door Lock System © 2023 - Enhancing home security with modern technology</i>
   </p>
-  <img src="assests/images/footer_logo.png" alt="Footer Logo"/>
+  <img src="assets/images/footer_logo.png" alt="Footer Logo"/>
 </div> 
