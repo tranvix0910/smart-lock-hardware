@@ -11,3 +11,5 @@
 /lib/PN532_HSU
 /lib/PN532_SPI
 /lib/PN532_SWHSU
+
+/assets/frontend
