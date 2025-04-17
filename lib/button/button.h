@@ -35,6 +35,8 @@ extern String topicDeleteFingerprintPublish;
 extern String topicAddRFIDCardPublish;
 extern String topicRemoveRFIDCardPublish;
 
+extern String topicUnlockSystemPublish;
+
 extern bool pendingFingerprintEnroll;
 extern String pendingFingerprintEnrollFaceId;
 
@@ -51,6 +53,9 @@ extern String pendingRemoveRFIDCardFaceId;
 extern String pendingRemoveRFIDCardUID;
 extern String pendingRemoveRFIDCardUIDLength;
 
+extern bool pendingUnlockSystem;
+extern String pendingUnlockSystemFaceId;
+
 typedef void (*HandleImageCallback)();
 typedef void (*DisplayResultCallback)(String message, uint16_t color);
 typedef void (*DisplayCornerTextCallback)(String message, uint16_t color, uint8_t fontSize);
@@ -65,6 +70,8 @@ void buttonEvent(
 );
 void enrollFingerprint(DisplayResultCallback displayResultCallback);
 void processDeleteFingerprint(uint8_t id, DisplayResultCallback displayResultCallback);
+void enrollRFID(DisplayResultCallback displayResultCallback);
 void processRemoveRFIDCard(DisplayResultCallback displayResultCallback, uint8_t* targetUID, uint8_t targetUIDLength);
+void processUnlockSystem(DisplayResultCallback displayResultCallback);
 
 #endif

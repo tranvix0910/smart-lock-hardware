@@ -3,6 +3,7 @@
 #include "freertos/FreeRTOS.h"
 #include "alert.h"
 #include "user_interface.h"
+#include "eeprom_manager.h"
 
 extern TaskHandle_t webSocketTask;
 extern TaskHandle_t buttonTask;
@@ -10,6 +11,7 @@ extern TaskHandle_t rfidModeTask;
 extern TaskHandle_t fingerprintModeTask;
 
 bool isEmergencyLocked = false;
+
 unsigned long emergencyLockStartTime = 0;
 const unsigned long EMERGENCY_LOCK_DURATION = 20000;
 
@@ -22,8 +24,13 @@ bool isSystemLocked = false;
 uint8_t failedAttempts = 0;
 bool doorHasBeenOpened = false;
 
+extern String topicUnlockSystemPublish;
+extern String deviceId;
+extern String userId;
+
 extern void displayUnlockScreen();
 extern void displayEmergencyLockScreen();
+extern void publishMessage(const char* topic, const char* message);
 
 void lockInit() {
     pinMode(LOCK_PIN, OUTPUT);
@@ -34,10 +41,46 @@ void lockInit() {
     isSystemLocked = false;
     failedAttempts = 0;
     doorHasBeenOpened = false;
-    isEmergencyLocked = false;
+
+    uint8_t lockStatus = EEPROM.read(EMERGENCY_LOCK_STATUS_ADDR);
+    isEmergencyLocked = (lockStatus == EMERGENCY_LOCK_VALUE);
+    
+    if (isEmergencyLocked) {
+        Serial.println("System was in emergency lock state before restart");
+        emergencyLockStartTime = millis();
+        displayEmergencyLockScreen();
+    }
+    
+    Serial.printf("Emergency lock status read from EEPROM: %d (value: 0x%02X)\n", isEmergencyLocked, lockStatus);
+}
+
+void applyEmergencyLockState() {
+
+    static bool applied = false;
+    
+    if (!applied && isEmergencyLocked) {
+
+        applied = true;
+
+        Serial.println("Applying emergency lock state - suspending tasks");
+        
+        if (webSocketTask != NULL) vTaskSuspend(webSocketTask);
+        if (buttonTask != NULL) vTaskSuspend(buttonTask);
+        if (rfidModeTask != NULL) vTaskSuspend(rfidModeTask);
+        if (fingerprintModeTask != NULL) vTaskSuspend(fingerprintModeTask);
+    }
+}
+
+void saveEmergencyLockStatus() {
+    EEPROMManager::saveEmergencyLockStatus(true);
+}
+
+void clearEmergencyLockStatus() {
+    EEPROMManager::clearEmergencyLockStatus(true);
 }
 
 void unlockSystem() {
+
     alertTurnOff();
     
     if (isEmergencyLocked) {
@@ -45,6 +88,7 @@ void unlockSystem() {
         if (buttonTask != NULL) vTaskResume(buttonTask);
         if (rfidModeTask != NULL) vTaskResume(rfidModeTask);
         if (fingerprintModeTask != NULL) vTaskResume(fingerprintModeTask);
+        clearEmergencyLockStatus();
     }
     
     isEmergencyLocked = false;
@@ -72,15 +116,19 @@ void emergencyLockSystem() {
     Serial.println("EMERGENCY SYSTEM LOCK ACTIVATED!");
     Serial.println("Too many failed attempts detected (5)");
     Serial.println("System will be locked until unlocked via app");
-    
-    if (webSocketTask != NULL) vTaskSuspend(webSocketTask);
-    if (buttonTask != NULL) vTaskSuspend(buttonTask);
-    if (rfidModeTask != NULL) vTaskSuspend(rfidModeTask);
-    if (fingerprintModeTask != NULL) vTaskSuspend(fingerprintModeTask);
+
+    saveEmergencyLockStatus();
 
     alertTurnOff();
 
-    displayEmergencyLockScreen();
+    StaticJsonDocument<200> responseDoc;
+    responseDoc["mode"] = "EMERGENCY LOCK SYSTEM";
+    responseDoc["deviceId"] = deviceId;
+    responseDoc["userId"] = userId;
+
+    String responseJson;
+    serializeJson(responseDoc, responseJson);
+    publishMessage(topicUnlockSystemPublish.c_str(), responseJson.c_str());
 }
 
 void incrementFailedAttempt() {
@@ -168,9 +216,12 @@ void lockUpdate() {
 }
 
 bool checkEmergencyLockStatus() {
+
     if (!isEmergencyLocked) {
         return false;
     }
+
+    applyEmergencyLockState();
     
     static bool alertActivated = false;
     if (!alertActivated) {

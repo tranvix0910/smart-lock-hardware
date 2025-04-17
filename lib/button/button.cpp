@@ -416,6 +416,69 @@ void processRemoveRFIDCard(DisplayResultCallback displayResultCallback, uint8_t*
     isNormalMode = true;
 }
 
+void processUnlockSystem(DisplayResultCallback displayResultCallback) {
+    
+    isNormalMode = false;
+    
+    bool faceAuthenticated = faceAuthentication();
+
+    if (!faceAuthenticated) {
+        displayResultCallback("Face auth required!", TFT_ORANGE);
+        Serial.println("Face authentication required for system unlock");
+        isNormalMode = true;
+        return;
+    }
+    
+    if (pendingUnlockSystem) {
+        Serial.println("Face authenticated, checking if face IDs match");
+        Serial.println("Authenticated Face ID: " + faceId);
+        Serial.println("Requested Face ID: " + pendingUnlockSystemFaceId);
+        
+        if (faceId != pendingUnlockSystemFaceId) {
+            Serial.println("Face ID mismatch! Cannot unlock system with different face");
+            displayResultCallback("Face ID mismatch!", TFT_RED);
+            
+            StaticJsonDocument<200> resultDoc;
+            resultDoc["faceId"] = pendingUnlockSystemFaceId;
+            resultDoc["authenticatedFaceId"] = faceId;
+            resultDoc["mode"] = "UNLOCK SYSTEM FAILED: FACE ID MISMATCH";
+            
+            String resultJson;
+            serializeJson(resultDoc, resultJson);
+            
+            publishMessage(topicUnlockSystemPublish.c_str(), resultJson.c_str());
+            Serial.println("Sent face ID mismatch error: " + resultJson);
+            
+            pendingUnlockSystem = false;
+            pendingUnlockSystemFaceId = "";
+            isNormalMode = true;
+            return;
+        }
+        
+        Serial.println("Face ID match confirmed, proceeding with system unlock");
+        
+        displayResultCallback("Unlocking system...", TFT_GREEN);
+        
+        // Mở khóa hệ thống
+        unlockSystem();
+        
+        StaticJsonDocument<200> resultDoc;
+        resultDoc["faceId"] = pendingUnlockSystemFaceId;
+        resultDoc["mode"] = "UNLOCK SYSTEM SUCCESS";
+        
+        String resultJson;
+        serializeJson(resultDoc, resultJson);
+        
+        publishMessage(topicUnlockSystemPublish.c_str(), resultJson.c_str());
+        Serial.println("Sent unlock success: " + resultJson);
+        
+        pendingUnlockSystem = false;
+        pendingUnlockSystemFaceId = "";
+    }
+    
+    isNormalMode = true;
+}
+
 void buttonEvent(
     HandleImageCallback handleImageCallback, 
     DisplayResultCallback displayResultCallback,
@@ -464,6 +527,10 @@ void buttonEvent(
 
     if(pendingRemoveRFIDCard){
         displayCornerText("Removing RFID", TFT_RED, 1);
+    }
+
+    if(pendingUnlockSystem){
+        displayCornerText("Emergency Unlock", TFT_GREEN, 1);
     }
 
     if (newMillis - lastMillis > 50) { 
@@ -530,8 +597,14 @@ void buttonEvent(
                 
                 processRemoveRFIDCard(displayResultCallback, cardUID, uidLength);
                 return;
+            } else if (pendingUnlockSystem) {
+                Serial.println("Processing pending system unlock request");
+                displayResultCallback("Authenticating face", TFT_ORANGE);
+                vTaskDelay(3000 / portTICK_PERIOD_MS);
+                
+                processUnlockSystem(displayResultCallback);
+                return;
             }
-
             if (pressDuration >= LONG_PRESS_TIME) {
                 Serial.println("Long press detected: Add Fingerprint");
                 isNormalMode = false;

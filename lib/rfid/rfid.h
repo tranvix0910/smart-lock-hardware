@@ -18,12 +18,13 @@
 extern String failedRFIDEnroll;
 extern bool isAddingCard;
 
+extern void publishRecentAccessLogs(String type, String status, String uid, String message);
+
 typedef void (*DisplayResultCallback)(String message, uint16_t color);
 
 void rfidInit();
 // void rfidRead();
 
-// Các hàm quản lý thẻ RFID
 bool addNewCard(uint8_t* uid, uint8_t uidLength);
 bool removeCard(uint8_t* uid, uint8_t uidLength);
 void clearAllCards();
@@ -34,11 +35,9 @@ bool handleAddNewCard(
     uint8_t* uidLength
 );
 
-// Các hàm xử lý UID cho MQTT
 String rfidUIDToString(uint8_t* uid, uint8_t uidLength);
 String createRFIDCardJSON(uint8_t* uid, uint8_t uidLength);
 
-// Unlocking with RFID
 bool unlockWithRFID(DisplayResultCallback displayResultCallback);
 void checkRFIDMode(DisplayResultCallback displayResultCallback);
 

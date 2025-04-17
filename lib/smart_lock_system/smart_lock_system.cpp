@@ -8,6 +8,7 @@
 #include "button.h"
 #include "mqtt.h"
 #include "alert.h"
+#include "lock.h"
 #include "esp_task_wdt.h"
 
 // TaskHandle_t rfidTask = NULL;                                       
@@ -64,7 +65,7 @@ void fingerprintModeTaskFunction(void *parameter) {
 void smartLockSystemInit() {
     Serial.begin(115200);
 
-    esp_task_wdt_deinit();  // Debug Mode
+    // esp_task_wdt_deinit();  // Debug Mode
 
     delay(TIME_DELAY);
     
@@ -94,8 +95,8 @@ void smartLockSystemInit() {
     
     Serial.println("Initializing other components...");
     buttonInit();
-    lockInit();
     alertInit();
+    lockInit();
     
     Serial.println("Creating RTOS tasks...");
     
@@ -113,7 +114,7 @@ void smartLockSystemInit() {
         "Button Task",
         4096,
         NULL,
-        4,
+        5,
         &buttonTask
     );
 
@@ -131,7 +132,7 @@ void smartLockSystemInit() {
         "WebSocket Task",     
         4096,
         NULL,                  
-        4,
+        3,
         &webSocketTask,
         1  
     );
@@ -141,7 +142,7 @@ void smartLockSystemInit() {
         "RFID Mode Task",
         4096,
         NULL,
-        2,                    
+        4,
         &rfidModeTask,
         0
     );
@@ -155,8 +156,9 @@ void smartLockSystemUpdate() {
         wifiConfigRun();
         return;
     }
-    
-    // Kiểm tra trạng thái khóa khẩn cấp trước khi làm bất cứ điều gì khác
+
+    clientLoop();
+
     if (checkEmergencyLockStatus()) {
         return;
     }
@@ -178,5 +180,4 @@ void smartLockSystemUpdate() {
     displayCheckMotion();
     lockUpdate();
     buttonResetMode();
-    clientLoop();
 }

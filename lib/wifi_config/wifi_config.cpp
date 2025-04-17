@@ -1103,7 +1103,6 @@ void wifiConfigInit() {
     char deviceId_temp[DEVICE_ID_SIZE], macAddress_temp[MAC_SIZE];
     char secretKey_temp[SECRET_KEY_SIZE], userId_temp[USER_ID_SIZE];
     
-    // Đọc thông tin cấu hình từ EEPROM
     EEPROMManager::readConfig(ssid_temp, SSID_ADDR, SSID_SIZE);
     EEPROMManager::readConfig(password_temp, PASSWORD_ADDR, PASSWORD_SIZE);
     EEPROMManager::readConfig(deviceId_temp, DEVICE_ID_ADDR, DEVICE_ID_SIZE);

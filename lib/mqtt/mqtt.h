@@ -12,6 +12,9 @@
 #include "recentAccessLogs.h"
 #include "eeprom_manager.h"
 
+extern TaskHandle_t webSocketTask;
+extern TaskHandle_t buttonTask;
+
 extern void deleteAllFingerprints();
 
 extern String deviceId;

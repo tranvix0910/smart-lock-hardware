@@ -19,6 +19,10 @@ String pendingRemoveRFIDCardFaceId = "";
 String pendingRemoveRFIDCardUID = "";
 String pendingRemoveRFIDCardUIDLength = "4 Bytes";
 
+// Unlock System
+bool pendingUnlockSystem = false;
+String pendingUnlockSystemFaceId = "";
+
 WiFiClientSecure net;
 PubSubClient AWSIoTClient(net);
 bool deviceVerified = false;
@@ -42,6 +46,9 @@ String topicRemoveRFIDCardSubscribe;
 
 String topicRecentAccessPublish;
 String topicRecentAccessSubscribe;
+
+String topicUnlockSystemPublish;
+String topicUnlockSystemSubscribe;
 
 bool subscribeTopic(const char* topic) {
     if (AWSIoTClient.subscribe(topic)) {
@@ -116,7 +123,6 @@ void handleMessage(char* topic, byte* payload, unsigned int length) {
     Serial.print("Raw payload: ");
     Serial.println(message);
 
-    // Phân tích JSON
     StaticJsonDocument<512> doc;
     DeserializationError error = deserializeJson(doc, message);
     
@@ -370,6 +376,39 @@ void handleMessage(char* topic, byte* payload, unsigned int length) {
         }
     }
 
+    if(topicString.startsWith("unlockSystem-server/")) {
+        Serial.println("Received unlock system request");
+        if(doc.containsKey("mode") && doc.containsKey("faceId")) {
+            String modeReceived = doc["mode"].as<String>();
+            String receivedFaceId = doc["faceId"].as<String>();
+
+            if(modeReceived == "UNLOCK SYSTEM REQUEST FROM SERVER") {
+                pendingUnlockSystem = true;
+                pendingUnlockSystemFaceId = receivedFaceId;
+
+                if (isEmergencyLocked) {
+                    Serial.println("Resuming tasks for face authentication");
+                    if (webSocketTask != NULL) vTaskResume(webSocketTask);
+                    if (buttonTask != NULL) vTaskResume(buttonTask);
+                }
+
+                StaticJsonDocument<200> responseDoc;
+                responseDoc["faceId"] = receivedFaceId;
+                responseDoc["mode"] = "UNLOCK SYSTEM ACCEPTED";
+                
+                String responseJson;
+                serializeJson(responseDoc, responseJson);
+                
+                publishMessage(topicUnlockSystemPublish.c_str(), responseJson.c_str());
+                Serial.println("Sent acknowledgment: " + responseJson);
+            } else {
+                Serial.println("Invalid request or not for this device");
+            }
+        } else {
+            Serial.println("Missing required fields in request");
+        }
+    }
+
     if (doc.containsKey("deviceId") && doc.containsKey("userId") && doc.containsKey("lockState")) {
         const char* receivedDeviceId = doc["deviceId"];
         const char* receivedUserId = doc["userId"];
@@ -427,6 +466,9 @@ bool connectToAWSIoTCore() {
     topicRecentAccessPublish = "recentAccess-smartlock/" + String(userId) + "/" + String(deviceId);
     topicRecentAccessSubscribe = "recentAccess-server/" + String(userId) + "/" + String(deviceId);
 
+    topicUnlockSystemPublish = "unlockSystem-smartlock/" + String(userId) + "/" + String(deviceId);
+    topicUnlockSystemSubscribe = "unlockSystem-server/" + String(userId) + "/" + String(deviceId);
+
     subscribeTopic(topicSubscribe.c_str());
     subscribeTopic(topicAddFingerprintSubscribe.c_str());
     subscribeTopic(topicDeleteFingerprintSubscribe.c_str());
@@ -434,6 +476,7 @@ bool connectToAWSIoTCore() {
     subscribeTopic(topicRemoveRFIDCardSubscribe.c_str());
     subscribeTopic(topicRecentAccessSubscribe.c_str());
     subscribeTopic(topicDeleteSubscribe.c_str());
+    subscribeTopic(topicUnlockSystemSubscribe.c_str());
     Serial.println("AWS IoT Connected!");
     return true;
 }
@@ -450,6 +493,7 @@ void reconnect() {
             subscribeTopic(topicAddRFIDCardSubscribe.c_str());
             subscribeTopic(topicRemoveRFIDCardSubscribe.c_str());
             subscribeTopic(topicRecentAccessSubscribe.c_str());
+            subscribeTopic(topicUnlockSystemSubscribe.c_str());
 
             Serial.println("AWS IoT Connected!");
         } else {

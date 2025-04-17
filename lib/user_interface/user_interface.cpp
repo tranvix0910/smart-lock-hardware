@@ -347,234 +347,152 @@ void displayJSONParsingResult(uint16_t color, String message, String livenessChe
 void displayUnlockScreen() {
     tft.setRotation(0);
     
-    uint8_t primaryR = 36, primaryG = 48, primaryB = 63; // #24303f - Xanh đen tối
-    uint8_t accentR = 235, accentG = 244, accentB = 93;  // #ebf45d - Vàng chanh
-    uint8_t blueR = 37, blueG = 99, blueB = 235;         // #2563eb - Xanh dương
-    uint8_t greenR = 34, greenG = 197, greenB = 94;      // Success green
+    uint8_t primaryR = 0, primaryG = 155, primaryB = 119;  // Màu chính xanh lá
+    uint8_t accentR = 255, accentG = 215, accentB = 0;     // Màu nhấn vàng gold
+    uint8_t successR = 46, successG = 204, successB = 113; // Màu thành công
     
-    int width = tft.width();
-    int height = tft.height();
-    int centerX = width / 2;
-    int centerY = height / 2;
-    
-    for (int i = 0; i < 12; i++) {
-        float factor = i / 12.0;
-        uint8_t r = primaryR * (1.0 - factor) + greenR * factor;
-        uint8_t g = primaryG * (1.0 - factor) + greenG * factor;
-        uint8_t b = primaryB * (1.0 - factor) + greenB * factor;
-        
+    for (int i = 0; i < 10; i++) {
+        uint8_t r = i * successR / 10;
+        uint8_t g = i * successG / 10;
+        uint8_t b = i * successB / 10;
         tft.fillScreen(tft.color565(r, g, b));
         delay(60);
     }
     
+    int width = tft.width();
+    int height = tft.height();
+    int centerX = width / 2;
+    
+    // Vẽ nền gradient
     for (int y = 0; y < height; y++) {
         float factor = y / (float)height;
-        uint8_t r = greenR - (factor * 30);
-        uint8_t g = greenG - (factor * 40);
-        uint8_t b = greenB + (factor * 30);
+        uint8_t r = primaryR + (factor * 20);
+        uint8_t g = primaryG - (factor * 20);
+        uint8_t b = primaryB + (factor * 20);
         tft.drawFastHLine(0, y, width, tft.color565(r, g, b));
     }
     
-    for (int r = 90; r > 0; r -= 5) {
-        uint8_t alpha = map(r, 90, 0, 10, 150);
-        uint16_t color = tft.color565(
-            accentR * alpha / 255,
-            accentG * alpha / 255,
-            accentB * alpha / 255
+    // Vẽ viền
+    for (int i = 0; i < 3; i++) {
+        tft.drawRoundRect(
+            5 + i, 5 + i, 
+            width - 10 - i*2, height - 10 - i*2, 
+            10, 
+            tft.color565(accentR - i*30, accentG - i*30, accentB)
         );
-        tft.drawCircle(centerX, centerY - 20, r, color);
-        if (r % 15 == 0) delay(30);
+        delay(50);
     }
     
-    int logoY = height / 3 - 10;
+    // Vẽ hiệu ứng tròn phía trên
+    int topCircleY = height / 4;
+    for (int r = 80; r > 0; r -= 4) {
+        uint8_t alpha = map(r, 80, 0, 20, 150);
+        uint16_t color = tft.color565(
+            accentR * alpha / 255, 
+            accentG * alpha / 255, 
+            accentB * alpha / 255
+        );
+        tft.drawCircle(centerX, topCircleY, r, color);
+        if (r % 10 == 0) delay(30);
+    }
+    
+    // Vẽ hình ổ khóa
+    int lockY = height * 2 / 5;
     int lockSize = width / 3;
     
+    // Phần bóng của ổ khóa
     tft.fillRoundRect(
         centerX - lockSize/2 + 5, 
-        logoY + lockSize/3 + 5, 
+        lockY + 5, 
         lockSize, 
         lockSize, 
         15, 
-        tft.color565(20, 70, 40)
+        tft.color565(0, 100, 50)
     );
     
+    // Phần chính của ổ khóa với hiệu ứng gradient
     for (int i = 8; i >= 0; i--) {
         uint8_t shade = i * 15;
         tft.fillRoundRect(
             centerX - lockSize/2 + i/2, 
-            logoY + lockSize/3 + i/2, 
+            lockY + i/2, 
             lockSize - i, 
             lockSize - i, 
             15, 
-            tft.color565(greenR - shade/2, greenG - shade, greenB - shade/2)
+            tft.color565(successR - shade/3, successG - shade, successB - shade/2)
         );
-        delay(30);
+        delay(40);
     }
     
+    // Viền ổ khóa
     tft.drawRoundRect(
         centerX - lockSize/2, 
-        logoY + lockSize/3, 
+        lockY, 
         lockSize, 
         lockSize, 
         15, 
         tft.color565(accentR, accentG, accentB)
     );
-
     tft.drawRoundRect(
         centerX - lockSize/2 + 1, 
-        logoY + lockSize/3 + 1, 
+        lockY + 1, 
         lockSize - 2, 
         lockSize - 2, 
         15, 
         tft.color565(accentR, accentG, accentB)
     );
     
-    for (int i = 0; i <= 10; i++) {
-        float factor = i / 10.0;
-        int radius = (lockSize/2) * factor;
-        if (radius < 3) continue;
-        
-        int angle = 70 + i * 7;
-        float radian = angle * PI / 180.0;
-        
-        int cX = centerX - (int)(cos(radian) * radius * 0.8);
-        int cY = logoY - (int)(sin(radian) * radius * 0.8);
-        
-        if (i > 0) {
-            for (int y = logoY - lockSize/2; y < logoY + 10; y++) {
-                float f = y / (float)height;
-                uint8_t r = greenR - (f * 30);
-                uint8_t g = greenG - (f * 40);
-                uint8_t b = greenB + (f * 30);
-                tft.drawFastHLine(0, y, width, tft.color565(r, g, b));
-            }
-        }
-        
-        tft.fillCircle(cX, cY, radius/4, tft.color565(greenR + 30, greenG + 30, greenB - 30));
-        tft.drawCircle(cX, cY, radius/4, tft.color565(accentR, accentG, accentB));
-        
-        int stemW = radius/4;
-        int stemH = radius/2;
-        tft.fillRoundRect(
-            cX - stemW/2,
-            cY,
-            stemW,
-            stemH,
-            stemW/2,
-            tft.color565(greenR + 30, greenG + 30, greenB - 30)
-        );
-        
-        delay(50);
-    }
-    
+    // Vẽ lỗ khóa
     int keyhole_x = centerX;
-    int keyhole_y = logoY + lockSize/2 + lockSize/8;
+    int keyhole_y = lockY + lockSize/2;
     
-    tft.fillCircle(keyhole_x + 1, keyhole_y + 1, lockSize/10, tft.color565(20, 50, 30));
-    tft.fillRect(keyhole_x - lockSize/20 + 1, keyhole_y + 1, 
-              lockSize/10, lockSize/6, tft.color565(20, 50, 30));
-    
-    tft.fillCircle(keyhole_x, keyhole_y, lockSize/10, tft.color565(15, 90, 40));
+    tft.fillCircle(keyhole_x, keyhole_y, lockSize/10, tft.color565(0, 100, 50));
     tft.fillRect(keyhole_x - lockSize/20, keyhole_y, 
-              lockSize/10, lockSize/6, tft.color565(15, 90, 40));
+               lockSize/10, lockSize/6, tft.color565(0, 100, 50));
     
-    int checkY = logoY + lockSize + 30;
+    // Vẽ biểu tượng tick (dấu tích)
+    int checkY = lockY + lockSize + 40;
     
     for (int r = 0; r <= 25; r += 5) {
         tft.fillCircle(centerX, checkY, r, tft.color565(accentR, accentG, accentB));
-        delay(40);
+        delay(30);
     }
     
-    tft.drawCircle(centerX, checkY, 25, tft.color565(20, 70, 40));
-    tft.drawCircle(centerX, checkY, 26, tft.color565(20, 70, 40));
+    tft.drawLine(centerX - 12, checkY, centerX - 2, checkY + 10, TFT_BLACK);
+    tft.drawLine(centerX - 11, checkY, centerX - 1, checkY + 10, TFT_BLACK);
+    tft.drawLine(centerX - 2, checkY + 10, centerX + 12, checkY - 10, TFT_BLACK);
+    tft.drawLine(centerX - 1, checkY + 10, centerX + 13, checkY - 10, TFT_BLACK);
     
-    for (int i = 0; i <= 10; i++) {
-        float factor = i / 10.0;
-        
-        int x1 = centerX - 12;
-        int y1 = checkY;
-        int x2 = centerX - 2 + (int)(factor * (centerX - 2 - (centerX - 12)));
-        int y2 = checkY + 10 * factor;
-        
-        tft.drawLine(x1, y1, x2, y2, TFT_BLACK);
-        tft.drawLine(x1 + 1, y1, x2 + 1, y2, TFT_BLACK);
-        
-        if (i >= 5) {
-            float factor2 = (i - 5) / 5.0;
-            if (factor2 > 1.0) factor2 = 1.0;
-            
-            int x3 = centerX - 2;
-            int y3 = checkY + 10;
-            int x4 = centerX - 2 + (int)(factor2 * ((centerX + 12) - (centerX - 2)));
-            int y4 = checkY + 10 - (int)(factor2 * 20);
-            
-            tft.drawLine(x3, y3, x4, y4, TFT_BLACK);
-            tft.drawLine(x3 + 1, y3, x4 + 1, y4, TFT_BLACK);
-        }
-        
-        delay(40);
-    }
-    
-    int textY = checkY + 50;
-    
-    tft.fillRect(0, textY - 15, width, 40, tft.color565(greenR - 15, greenG - 20, greenB + 10));
-    
+    // Hiển thị tiêu đề SYSTEM UNLOCKED
+    int titleY = checkY + 40;
+    tft.fillRect(0, titleY - 15, width, 40, tft.color565(primaryR, primaryG, primaryB));
+
     tft.setTextDatum(TC_DATUM);
-    tft.setTextColor(tft.color565(20, 70, 40));
-    tft.drawString("SYSTEM UNLOCKED", centerX + 2, textY + 2, GFXFF);
-    
-    tft.setTextColor(tft.color565(accentR, accentG, accentB));
-    tft.drawString("SYSTEM UNLOCKED", centerX, textY, GFXFF);
-    
-    delay(200);
-    
-    textY += 30;
-    tft.fillRect(0, textY - 10, width, 30, tft.color565(greenR - 15, greenG - 20, greenB + 10));
-    
-    tft.setTextColor(tft.color565(20, 70, 40));
-    tft.drawString("Access Granted", centerX + 1, textY + 1, GFXFF);
+    tft.setTextColor(tft.color565(0, 80, 40));
+    tft.drawString("SYSTEM UNLOCKED", centerX + 1, titleY + 1, GFXFF);
     
     tft.setTextColor(TFT_WHITE);
-    tft.drawString("Access Granted", centerX, textY, GFXFF);
+    tft.drawString("SYSTEM UNLOCKED", centerX, titleY, GFXFF);
+    delay(300);
     
-    int countdownSeconds = 3;
-    int timerY = height - 50;
+    // Hiển thị thông báo ACCESS GRANTED
+    int statusY = titleY + 50;
+    tft.fillRect(0, statusY - 15, width, 40, tft.color565(primaryR, primaryG, primaryB));
     
-    tft.fillRoundRect(
-        centerX - 70, 
-        timerY, 
-        140, 
-        35, 
-        15, 
-        tft.color565(primaryR, primaryG, primaryB)
-    );
+    tft.setTextColor(tft.color565(0, 80, 40));
+    tft.drawString("ACCESS GRANTED", centerX + 1, statusY + 1, GFXFF);
     
-    tft.drawRoundRect(
-        centerX - 70, 
-        timerY, 
-        140, 
-        35, 
-        15, 
-        tft.color565(accentR, accentG, accentB)
-    );
+    tft.setTextColor(TFT_WHITE);
+    tft.drawString("ACCESS GRANTED", centerX, statusY, GFXFF);
+    delay(300);
     
-    tft.drawRoundRect(
-        centerX - 71, 
-        timerY - 1, 
-        142, 
-        37, 
-        15, 
-        tft.color565(accentR, accentG, accentB)
-    );
+    // Đếm ngược và thanh tiến trình
+    int countdownY = height - 70;
     
-    for (int t = countdownSeconds; t >= 0; t--) {
-        tft.fillRect(
-            centerX - 65, 
-            timerY + 5, 
-            130, 
-            25, 
-            tft.color565(primaryR, primaryG, primaryB)
-        );
+    for (int t = 3; t >= 0; t--) {
+        // Vẽ nền cho đồng hồ đếm ngược
+        tft.fillRoundRect(centerX - 80, countdownY, 160, 50, 10, tft.color565(0, 100, 80));
+        tft.drawRoundRect(centerX - 80, countdownY, 160, 50, 10, tft.color565(accentR, accentG, accentB));
         
         tft.setTextDatum(MC_DATUM);
         
@@ -582,38 +500,32 @@ void displayUnlockScreen() {
             char timeStr[20];
             sprintf(timeStr, "Returning in %d", t);
             
-            tft.setTextColor(tft.color565(accentR, accentG, accentB));
-            tft.drawString(timeStr, centerX, timerY + 17, GFXFF);
+            tft.setTextColor(TFT_WHITE);
+            tft.drawString(timeStr, centerX, countdownY + 20, GFXFF);
             
-            int barWidth = map(t, countdownSeconds, 0, 10, 130);
-            tft.fillRect(
-                centerX - 65, 
-                timerY + 28, 
-                barWidth, 
-                3, 
-                tft.color565(blueR, blueG, blueB)
-            );
-        } else {
-            tft.setTextColor(tft.color565(accentR, accentG, accentB));
-            tft.drawString("Returning now", centerX, timerY + 17, GFXFF);
-        }
-        
-        if (t > 0) {
+            // Vẽ thanh tiến trình
+            int barY = countdownY + 35;
+            int barWidth = map(t, 3, 0, 150, 0);
+            tft.fillRect(centerX - 75, barY, 150, 5, tft.color565(0, 70, 50));
+            tft.fillRect(centerX - 75, barY, barWidth, 5, tft.color565(accentR, accentG, accentB));
+            
             delay(1000);
         } else {
+            tft.setTextColor(TFT_WHITE);
+            tft.drawString("Returning now", centerX, countdownY + 20, GFXFF);
             delay(300);
         }
     }
     
-    for (int i = 0; i < 10; i++) {
-        uint8_t r = map(i, 0, 10, greenR - 15, 0);
-        uint8_t g = map(i, 0, 10, greenG - 20, 0);
-        uint8_t b = map(i, 0, 10, greenB + 10, 0);
-        
+    // Hiệu ứng kết thúc
+    for (int i = 10; i >= 0; i--) {
+        uint8_t r = i * successR / 10;
+        uint8_t g = i * successG / 10;
+        uint8_t b = i * successB / 10;
         tft.fillScreen(tft.color565(r, g, b));
         delay(40);
     }
-
+    
     tft.setRotation(1);
 }
 

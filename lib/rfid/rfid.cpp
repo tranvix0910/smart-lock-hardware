@@ -249,6 +249,7 @@ bool unlockWithRFID(DisplayResultCallback displayResultCallback) {
         displayResultCallback(message, TFT_GREEN);
         Serial.print("RFID card matched! UID: ");
         Serial.println(rfidUIDToString(uid, uidLength));
+        publishRecentAccessLogs("RFID", "SUCCESS", rfidUIDToString(uid, uidLength), "Access Granted");
         alertBeep(200);
         vTaskDelay(1000 / portTICK_PERIOD_MS);
         lockOpen();
@@ -257,6 +258,7 @@ bool unlockWithRFID(DisplayResultCallback displayResultCallback) {
     } else {
         displayResultCallback("Access Denied!", TFT_RED);
         Serial.println("RFID card not verified!");
+        publishRecentAccessLogs("RFID", "FAILED", rfidUIDToString(uid, uidLength), "Access Denied");
         vTaskDelay(1000 / portTICK_PERIOD_MS);
         isNormalMode = true;
         incrementFailedAttempt();

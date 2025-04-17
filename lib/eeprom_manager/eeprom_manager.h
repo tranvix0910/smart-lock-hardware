@@ -25,10 +25,12 @@
 #define USER_ID_ADDR 160
 #define USER_ID_SIZE 37
 
-// Định nghĩa địa chỉ bắt đầu của phân vùng RFID
 #define RFID_START_ADDR 200
 
-// Định nghĩa giá trị đặc biệt cho ô trống RFID
+#define EMERGENCY_LOCK_STATUS_ADDR (CONFIG_PARTITION_SIZE + RFID_PARTITION_SIZE)
+#define EMERGENCY_LOCK_VALUE 0xAA
+#define EMERGENCY_UNLOCK_VALUE 0x00
+
 #define RFID_EMPTY_SLOT 0xFF
 
 class EEPROMManager {
@@ -46,6 +48,11 @@ public:
     static bool findEmptyRFIDSlot(uint16_t& slotAddr);
     static bool isRFIDCardExists(uint8_t* uid, uint8_t uidLength);
     static void clearAllRFIDCards(bool autoCommit = false);
+    
+    // Hàm quản lý trạng thái emergency lock
+    static bool saveEmergencyLockStatus(bool autoCommit = false);
+    static bool clearEmergencyLockStatus(bool autoCommit = false);
+    static bool isEmergencyLocked();
     
     // Hàm tiện ích
     static void commitChanges();

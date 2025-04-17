@@ -29,8 +29,10 @@ void checkDoorStatus();
 void incrementFailedAttempt();
 void resetFailedAttempts();
 void unlockSystem();
-
 void emergencyLockSystem();
 bool checkEmergencyLockStatus();
+void applyEmergencyLockState();
+void saveEmergencyLockStatus();
+void clearEmergencyLockStatus();
 
 #endif

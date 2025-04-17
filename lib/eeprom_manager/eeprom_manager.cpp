@@ -174,4 +174,34 @@ void EEPROMManager::commitChanges() {
     if (!EEPROM.commit()) {
         Serial.println("Failed to commit EEPROM changes");
     }
-} 
+}
+
+bool EEPROMManager::saveEmergencyLockStatus(bool autoCommit) {
+    if (!isValidAddress(EMERGENCY_LOCK_STATUS_ADDR, 1)) {
+        Serial.println("Invalid address for emergency lock status");
+        return false;
+    }
+
+    EEPROM.write(EMERGENCY_LOCK_STATUS_ADDR, EMERGENCY_LOCK_VALUE);
+    Serial.println("Emergency lock status saved to EEPROM");
+    
+    if (autoCommit && !_batchWriteMode) {
+        commitChanges();
+    }
+    return true;
+}
+
+bool EEPROMManager::clearEmergencyLockStatus(bool autoCommit) {
+    if (!isValidAddress(EMERGENCY_LOCK_STATUS_ADDR, 1)) {
+        Serial.println("Invalid address for emergency lock status");
+        return false;
+    }
+
+    EEPROM.write(EMERGENCY_LOCK_STATUS_ADDR, EMERGENCY_UNLOCK_VALUE);
+    Serial.println("Emergency lock status cleared from EEPROM");
+    
+    if (autoCommit && !_batchWriteMode) {
+        commitChanges();
+    }
+    return true;
+}
