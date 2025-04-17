@@ -29,6 +29,5 @@ void wifiAPSetup();
 void generateDeviceInfo();
 void getDeviceInfoValues(const char* &deviceIdPtr, const char* &userIdPtr);
 void saveUserId(String id);
-void clearAllData();
 
 #endif 

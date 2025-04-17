@@ -8,6 +8,7 @@
 #include "button.h"
 #include "mqtt.h"
 #include "alert.h"
+#include "esp_task_wdt.h"
 
 // TaskHandle_t rfidTask = NULL;                                       
 TaskHandle_t webSocketTask = NULL;
@@ -48,8 +49,8 @@ void rfidModeTaskFunction(void *parameter) {
     for(;;) {
         if (!isAddingCard) {
             checkRFIDMode(displayResult);
-            vTaskDelay(50 / portTICK_PERIOD_MS);
         }
+        vTaskDelay(50 / portTICK_PERIOD_MS);
     }
 }
 
@@ -62,7 +63,9 @@ void fingerprintModeTaskFunction(void *parameter) {
 
 void smartLockSystemInit() {
     Serial.begin(115200);
-    
+
+    esp_task_wdt_deinit();  // Debug Mode
+
     delay(TIME_DELAY);
     
     displayInit();

@@ -25,7 +25,7 @@ void fingerprintInit();
 bool getFingerprintEnroll(int id, DisplayResultCallback displayResultCallback);
 int getFingerprintId();
 bool unlockWithFingerprint(DisplayResultCallback displayResultCallback);
-bool deleteAllFingerprints(DisplayResultCallback displayResultCallback);
+void deleteAllFingerprints();
 bool deleteFingerprint(uint8_t id, DisplayResultCallback displayResultCallback);
 bool isFingerIDFree(uint8_t id);
 int getNextFreeID();

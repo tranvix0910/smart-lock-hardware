@@ -82,4 +82,5 @@ void displayCheckMotion();
 void displayResult(String message, uint16_t color);
 void displayUnlockScreen();
 void displayEmergencyLockScreen();
+
 #endif

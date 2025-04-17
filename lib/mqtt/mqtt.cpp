@@ -1,22 +1,19 @@
 #include "mqtt.h"
-#include "freertos/FreeRTOS.h"
-extern String deviceId;
-extern String macAddress;
-extern String userId;
 
-// Variables for server-requested fingerprint enrollment - defined here
+// Fingerprint Enroll
 bool pendingFingerprintEnroll = false;
-String pendingFaceId = "";
+String pendingFingerprintEnrollFaceId = "";
 
-// Variables for server-requested fingerprint deletion
+// Fingerprint Delete
 bool pendingDeleteFingerprint = false;
-String pendingDeleteFaceId = "";
+String pendingDeleteFingerprintFaceId = "";
 int pendingDeleteFingerprintId = -1;
 
-// Variables for server-requested RFID enrollment
-String pendingRFIDFaceId = "";
+// RFID Enroll
+String pendingRFIDEnrollFaceId = "";
 bool pendingRFIDEnroll = false;
 
+// RFID Delete
 bool pendingRemoveRFIDCard = false;
 String pendingRemoveRFIDCardFaceId = "";
 String pendingRemoveRFIDCardUID = "";
@@ -178,16 +175,17 @@ void handleMessage(char* topic, byte* payload, unsigned int length) {
             Serial.println("Delete request accepted");
             deviceVerified = false;
             Serial.println("Server confirmed deletion, clearing EEPROM...");
-                
-            for(int i = 0; i < EEPROM.length(); i++) {
-                EEPROM.write(i, 0);
-            }
             
-            if (!EEPROM.commit()) {
-                Serial.println("Error committing to EEPROM!");
-                return;
-            }
-                
+            EEPROMManager::beginBatchWrite();
+            
+            EEPROMManager::clearConfig(false);
+            
+            EEPROMManager::clearAllRFIDCards(false);
+
+            deleteAllFingerprints();
+
+            EEPROMManager::endBatchWrite();
+            
             Serial.println("EEPROM cleared successfully!");
             Serial.println("Device will restart in 2 seconds...");
             
@@ -232,7 +230,7 @@ void handleMessage(char* topic, byte* payload, unsigned int length) {
                 
                 // Set the pending flag and store the face ID
                 pendingFingerprintEnroll = true;
-                pendingFaceId = faceIdReceived;
+                pendingFingerprintEnrollFaceId = faceIdReceived;
                 
                 // Send acknowledgment
                 StaticJsonDocument<200> responseDoc;
@@ -273,7 +271,7 @@ void handleMessage(char* topic, byte* payload, unsigned int length) {
                 vTaskDelay(3000 / portTICK_PERIOD_MS);
                 
                 pendingDeleteFingerprint = true;
-                pendingDeleteFaceId = requestedFaceId;
+                pendingDeleteFingerprintFaceId = requestedFaceId;
                 pendingDeleteFingerprintId = fingerprintIdStr.toInt();
                 
                 StaticJsonDocument<200> responseDoc;
@@ -313,7 +311,7 @@ void handleMessage(char* topic, byte* payload, unsigned int length) {
                 Serial.println("Face ID: " + receivedFaceId);
                 
                 pendingRFIDEnroll = true;
-                pendingRFIDFaceId = receivedFaceId;
+                pendingRFIDEnrollFaceId = receivedFaceId;
                 
                 StaticJsonDocument<200> responseDoc;
                 responseDoc["faceId"] = receivedFaceId;

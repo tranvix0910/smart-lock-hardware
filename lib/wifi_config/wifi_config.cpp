@@ -1185,7 +1185,3 @@ void saveUserId(String id) {
     Serial.println("Saving User ID to EEPROM: " + id);
     EEPROMManager::writeConfig(id.c_str(), USER_ID_ADDR, USER_ID_SIZE);
 }
-
-void clearAllData() {
-    EEPROMManager::clearConfig();
-}

@@ -5,9 +5,18 @@
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
 #include <EEPROM.h>
+#include <freertos/FreeRTOS.h>
+
 #include "secrets.h"
 #include "lock.h"
 #include "recentAccessLogs.h"
+#include "eeprom_manager.h"
+
+extern void deleteAllFingerprints();
+
+extern String deviceId;
+extern String macAddress;
+extern String userId;
 
 // Topic strings
 extern String topicPublish;
@@ -30,16 +39,16 @@ extern String topicRecentAccessSubscribe;
 
 // Fingerprint enrollment variables
 extern bool pendingFingerprintEnroll;
-extern String pendingFaceId;
+extern String pendingFingerprintEnrollFaceId;
 
 // Fingerprint deletion variables
 extern bool pendingDeleteFingerprint;
-extern String pendingDeleteFaceId;
+extern String pendingDeleteFingerprintFaceId;
 extern int pendingDeleteFingerprintId;
 
 // RFID enrollment variables
 extern bool pendingRFIDEnroll;
-extern String pendingRFIDFaceId;
+extern String pendingRFIDEnrollFaceId;
 extern String pendingRFIDDeleteUIDLength;
 
 // External functions

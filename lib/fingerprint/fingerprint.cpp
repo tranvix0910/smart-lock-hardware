@@ -296,19 +296,15 @@ bool unlockWithFingerprint(DisplayResultCallback displayResultCallback) {
     }
 }
 
-bool deleteAllFingerprints(DisplayResultCallback displayResultCallback) {
-    displayResultCallback("Deleting all prints...", TFT_CYAN);
-    
+void deleteAllFingerprints() {
     uint8_t p = finger.emptyDatabase();
     if (p == FINGERPRINT_OK) {
         Serial.println("All fingerprints deleted successfully!");
-        displayResultCallback("All prints deleted!", TFT_GREEN);
-        return true;
+        return;
     } else {
         Serial.print("Failed to delete all fingerprints, error code: ");
         Serial.println(p);
-        displayResultCallback("Delete failed!", TFT_RED);
-        return false;
+        return;
     }
 }
 

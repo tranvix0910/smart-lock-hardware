@@ -21,7 +21,7 @@
 #define BUTTON_RESET_PIN 13
 
 extern bool pendingFingerprintEnroll;
-extern String pendingFaceId;
+extern String pendingFingerprintEnrollFaceId;
 extern uint8_t fingerprintMode;
 
 extern String deviceId;
@@ -36,14 +36,14 @@ extern String topicAddRFIDCardPublish;
 extern String topicRemoveRFIDCardPublish;
 
 extern bool pendingFingerprintEnroll;
-extern String pendingFaceId;
+extern String pendingFingerprintEnrollFaceId;
 
 extern bool pendingRFIDEnroll;
-extern String pendingRFIDFaceId;
+extern String pendingRFIDEnrollFaceId;
 extern String failedRFIDEnroll;
 
 extern bool pendingDeleteFingerprint;
-extern String pendingDeleteFaceId;
+extern String pendingDeleteFingerprintFaceId;
 extern int pendingDeleteFingerprintId;
 
 extern bool pendingRemoveRFIDCard;
