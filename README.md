@@ -3,7 +3,7 @@
 <div align="center">
   <img src="assets/images/logo.png" alt="Smart Door Lock Logo" width="200"/>
   <br>
-  <em>Advanced Security System with S</em>
+  <em>Advanced Security System with Smart Lock System</em>
   <br><br>
   
   [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -272,5 +272,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
   <p>
     <i>Smart Door Lock System © 2023 - Enhancing home security with modern technology</i>
   </p>
-  <img src="assests/images/footer_logo.png" alt="Footer Logo" width="100"/>
+  <img src="assests/images/footer_logo.png" alt="Footer Logo"/>
 </div> 
