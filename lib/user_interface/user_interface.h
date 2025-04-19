@@ -21,7 +21,7 @@
 #include "fingerprint.h"
 #include "lock.h"
 #include "magnetic_hall.h"
-#include "recentAccessLogs.h"
+#include "recent_access_logs.h"
 
 using namespace websockets;
 

@@ -50,6 +50,8 @@ String topicRecentAccessSubscribe;
 String topicUnlockSystemPublish;
 String topicUnlockSystemSubscribe;
 
+String topicUploadImagePublish;
+
 bool subscribeTopic(const char* topic) {
     if (AWSIoTClient.subscribe(topic)) {
         Serial.print("Subscribed to topic: ");
@@ -471,6 +473,8 @@ bool connectToAWSIoTCore() {
 
     topicUnlockSystemPublish = "unlockSystem-smartlock/" + String(userId) + "/" + String(deviceId);
     topicUnlockSystemSubscribe = "unlockSystem-server/" + String(userId) + "/" + String(deviceId);
+
+    topicUploadImagePublish = "uploadImage-smartlock/" + String(userId) + "/" + String(deviceId);
 
     subscribeTopic(topicSubscribe.c_str());
     subscribeTopic(topicAddFingerprintSubscribe.c_str());

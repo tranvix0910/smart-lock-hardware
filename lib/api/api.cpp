@@ -1,4 +1,6 @@
 #include "api.h"
+#include <time.h>
+#include <sys/time.h>
 
 // Define global variables
 // String livenessCheckResult = "";
@@ -12,6 +14,9 @@ const char* user_name = "Undefined";
 extern bool pendingDeleteFingerprint;
 extern bool pendingFingerprintEnroll;
 extern bool pendingRFIDEnroll;
+
+extern String deviceId;
+extern String userId;
 
 String convertToVietnamTime(String isoTimestamp) {
     // Trích xuất năm, tháng, ngày, giờ, phút, giây từ chuỗi timestamp
@@ -87,12 +92,38 @@ void parsingJSONResult(String response, uint16_t SCREEN_COLOR, String message, S
 
 void uploadImageToS3(WebsocketsMessage msg){
 
+    time_t now;
+    struct tm timeinfo;
+    
+    configTime(25200, 0, "pool.ntp.org", "time.nist.gov");
+    
+    int retries = 0;
+    while (!getLocalTime(&timeinfo) && retries < 10) {
+        Serial.println("Failed to obtain time, retrying...");
+        retries++;
+    }
+
+    char date_string[11];
+    sprintf(date_string, "%02d-%02d-%04d", 
+            timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year + 1900);
+    
+    char timestamp[20];
+    sprintf(timestamp, "%04d-%02d-%02d_%02d-%02d-%02d", 
+            timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+            timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+    
+    Serial.print("Current Vietnam time: ");
+    Serial.println(timestamp);
+    Serial.print("Date string for folder: ");
+    Serial.println(date_string);
+
     String bucketName = "smart-door-system";
     String fileName = "image.jpeg";
 
     HTTPClient http;
 
-    String apiUrl = "https://rxmieh048b.execute-api.ap-southeast-1.amazonaws.com/upload/" + bucketName + "/" + fileName;
+    String apiUrl = "https://rxmieh048b.execute-api.ap-southeast-1.amazonaws.com/upload/" + bucketName + "/" + fileName + 
+                   "?userId=" + userId + "&deviceId=" + deviceId;
 
     Serial.println("API URL: " + apiUrl);
 
