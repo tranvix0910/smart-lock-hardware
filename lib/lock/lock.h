@@ -34,5 +34,6 @@ bool checkEmergencyLockStatus();
 void applyEmergencyLockState();
 void saveEmergencyLockStatus();
 void clearEmergencyLockStatus();
+void publishEmergencyLockStatus();
 
 #endif

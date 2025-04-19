@@ -379,6 +379,7 @@ void handleMessage(char* topic, byte* payload, unsigned int length) {
     if(topicString.startsWith("unlockSystem-server/")) {
         Serial.println("Received unlock system request");
         if(doc.containsKey("mode") && doc.containsKey("faceId")) {
+
             String modeReceived = doc["mode"].as<String>();
             String receivedFaceId = doc["faceId"].as<String>();
 
@@ -393,6 +394,8 @@ void handleMessage(char* topic, byte* payload, unsigned int length) {
                 }
 
                 StaticJsonDocument<200> responseDoc;
+                responseDoc["userId"] = userId;
+                responseDoc["deviceId"] = deviceId;
                 responseDoc["faceId"] = receivedFaceId;
                 responseDoc["mode"] = "UNLOCK SYSTEM ACCEPTED";
                 
@@ -511,4 +514,3 @@ void clientLoop() {
     }
     AWSIoTClient.loop();
 }
-

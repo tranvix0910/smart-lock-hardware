@@ -54,6 +54,17 @@ void lockInit() {
     Serial.printf("Emergency lock status read from EEPROM: %d (value: 0x%02X)\n", isEmergencyLocked, lockStatus);
 }
 
+void publishEmergencyLockStatus() {
+    StaticJsonDocument<200> responseDoc;
+    responseDoc["mode"] = "EMERGENCY LOCK SYSTEM";
+    responseDoc["deviceId"] = deviceId;
+    responseDoc["userId"] = userId;
+
+    String responseJson;
+    serializeJson(responseDoc, responseJson);
+    publishMessage(topicUnlockSystemPublish.c_str(), responseJson.c_str());
+}
+
 void applyEmergencyLockState() {
 
     static bool applied = false;
@@ -61,7 +72,6 @@ void applyEmergencyLockState() {
     if (!applied && isEmergencyLocked) {
 
         applied = true;
-
         Serial.println("Applying emergency lock state - suspending tasks");
         
         if (webSocketTask != NULL) vTaskSuspend(webSocketTask);
@@ -116,19 +126,6 @@ void emergencyLockSystem() {
     Serial.println("EMERGENCY SYSTEM LOCK ACTIVATED!");
     Serial.println("Too many failed attempts detected (5)");
     Serial.println("System will be locked until unlocked via app");
-
-    saveEmergencyLockStatus();
-
-    alertTurnOff();
-
-    StaticJsonDocument<200> responseDoc;
-    responseDoc["mode"] = "EMERGENCY LOCK SYSTEM";
-    responseDoc["deviceId"] = deviceId;
-    responseDoc["userId"] = userId;
-
-    String responseJson;
-    serializeJson(responseDoc, responseJson);
-    publishMessage(topicUnlockSystemPublish.c_str(), responseJson.c_str());
 }
 
 void incrementFailedAttempt() {
@@ -136,6 +133,8 @@ void incrementFailedAttempt() {
     Serial.printf("Failed attempt %d of %d\n", failedAttempts, MAX_FAILED_ATTEMPTS);
     
     if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
+        publishEmergencyLockStatus();
+        saveEmergencyLockStatus();
         emergencyLockSystem();
     } else {
         alertTurnOn();
@@ -235,8 +234,8 @@ bool checkEmergencyLockStatus() {
     
     if (isAlertTimeOver && elapsedTime < EMERGENCY_LOCK_DURATION + 100) {
         Serial.println("Alert stopped after timeout, system remains locked");
-        alertTurnOff();
         displayEmergencyLockScreen();
+        alertTurnOff();
     }
     
     static unsigned long lastTimeUpdate = 0;

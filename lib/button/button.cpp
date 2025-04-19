@@ -464,6 +464,8 @@ void processUnlockSystem(DisplayResultCallback displayResultCallback) {
         
         StaticJsonDocument<200> resultDoc;
         resultDoc["faceId"] = pendingUnlockSystemFaceId;
+        resultDoc["deviceId"] = deviceId;
+        resultDoc["userId"] = userId;
         resultDoc["mode"] = "UNLOCK SYSTEM SUCCESS";
         
         String resultJson;
